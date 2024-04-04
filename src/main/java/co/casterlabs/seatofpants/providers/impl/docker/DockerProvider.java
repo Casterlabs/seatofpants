@@ -46,7 +46,8 @@ public class DockerProvider implements InstanceProvider {
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
 
             CommandBuilder command = new CommandBuilder()
-                .add("docker", "run", "--rm")
+                .add("docker", "run")
+                .add("--rm")
                 .add("--name", idToUse)
                 .add("-p", String.format("%d:%d", port, this.portToMap));
             for (Map.Entry<String, String> entry : env.entrySet()) {
