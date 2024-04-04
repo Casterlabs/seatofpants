@@ -1,7 +1,7 @@
 package co.casterlabs.seatofpants.providers;
 
 import co.casterlabs.rakurai.json.element.JsonObject;
-import co.casterlabs.seatofpants.providers.impl.exec.IPExec;
+import co.casterlabs.seatofpants.providers.impl.exec.ExecProvider;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.SneakyThrows;
@@ -20,7 +20,7 @@ public interface InstanceProvider {
 
     @AllArgsConstructor
     public static enum Type {
-        EXEC(IPExec.class);
+        EXEC(ExecProvider.class);
 
         private final Class<? extends InstanceProvider> clazz;
 

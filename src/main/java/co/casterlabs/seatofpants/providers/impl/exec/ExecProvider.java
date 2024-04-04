@@ -18,7 +18,7 @@ import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
-public class IPExec implements InstanceProvider {
+public class ExecProvider implements InstanceProvider {
     public static final FastLogger LOGGER = SeatOfPants.LOGGER.createChild("Exec Instance Provider");
 
     private String[] applicationToExec;
