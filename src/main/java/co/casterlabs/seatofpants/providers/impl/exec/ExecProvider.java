@@ -14,6 +14,7 @@ import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.providers.Instance;
 import co.casterlabs.seatofpants.providers.InstanceCreationException;
 import co.casterlabs.seatofpants.providers.InstanceProvider;
+import co.casterlabs.seatofpants.util.CommandBuilder;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
@@ -41,12 +42,12 @@ public class ExecProvider implements InstanceProvider {
 
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
 
-            String[] command = this.applicationToExec.clone();
-            for (int idx = 0; idx < command.length; idx++) {
-                command[idx] = command[idx].replace("%port%", String.valueOf(port));
+            CommandBuilder command = new CommandBuilder();
+            for (String part : this.applicationToExec) {
+                command.add(part.replace("%port%", String.valueOf(port)));
             }
 
-            Process proc = new ProcessBuilder(command)
+            Process proc = new ProcessBuilder(command.toString())
                 .redirectError(Redirect.PIPE)
                 .redirectOutput(Redirect.PIPE)
                 .redirectInput(Redirect.PIPE)

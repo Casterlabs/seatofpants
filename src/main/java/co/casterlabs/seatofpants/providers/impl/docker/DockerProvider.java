@@ -13,6 +13,7 @@ import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.providers.Instance;
 import co.casterlabs.seatofpants.providers.InstanceCreationException;
 import co.casterlabs.seatofpants.providers.InstanceProvider;
+import co.casterlabs.seatofpants.util.CommandBuilder;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
@@ -42,14 +43,13 @@ public class DockerProvider implements InstanceProvider {
 
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
 
-            Process proc = new ProcessBuilder(
-                "docker",
-                "run",
-                "--rm",
-                "--name", idToUse,
-                "-p", String.format("%d:%d", port, this.portToMap),
-                this.imageToUse
-            )
+            CommandBuilder command = new CommandBuilder()
+                .add("docker", "run", "--rm")
+                .add("--name", idToUse)
+                .add("-p", String.format("%d:%d", port, this.portToMap));
+            command.add(this.imageToUse);
+
+            Process proc = new ProcessBuilder(command.asList())
                 .redirectError(Redirect.PIPE)
                 .redirectOutput(Redirect.PIPE)
                 .redirectInput(Redirect.PIPE)
