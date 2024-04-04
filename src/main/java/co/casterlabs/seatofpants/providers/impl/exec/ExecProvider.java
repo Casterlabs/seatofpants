@@ -4,8 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.ProcessBuilder.Redirect;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
 
 import co.casterlabs.rakurai.json.Rson;
@@ -15,6 +13,7 @@ import co.casterlabs.seatofpants.providers.Instance;
 import co.casterlabs.seatofpants.providers.InstanceCreationException;
 import co.casterlabs.seatofpants.providers.InstanceProvider;
 import co.casterlabs.seatofpants.util.CommandBuilder;
+import co.casterlabs.seatofpants.util.NetworkUtil;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
@@ -33,13 +32,7 @@ public class ExecProvider implements InstanceProvider {
     @Override
     public Instance create(@NonNull String idToUse) throws InstanceCreationException {
         try {
-            int port;
-            try (ServerSocket serverSocket = new ServerSocket()) {
-                serverSocket.setReuseAddress(false);
-                serverSocket.bind(new InetSocketAddress("127.0.0.1", 0), 1);
-                port = serverSocket.getLocalPort();
-            }
-
+            int port = NetworkUtil.randomPort();
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
 
             CommandBuilder command = new CommandBuilder();
