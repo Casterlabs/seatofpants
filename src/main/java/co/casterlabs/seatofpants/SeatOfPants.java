@@ -16,7 +16,7 @@ public class SeatOfPants {
     public static InstanceProvider provider;
 
     public static String generateId() {
-        return "SOP/" + config.sopId + "/" + UUID.randomUUID().toString();
+        return "SOP." + config.sopId + "." + UUID.randomUUID().toString();
     }
 
 }

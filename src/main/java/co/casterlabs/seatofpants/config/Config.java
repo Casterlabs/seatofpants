@@ -23,5 +23,7 @@ public class Config {
 
     public InstanceProvider.Type providerType;
     public JsonObject providerConfig;
+    public int providerMaxRetries = 500;
+    public long providerRetryTimeout = 100;
 
 }

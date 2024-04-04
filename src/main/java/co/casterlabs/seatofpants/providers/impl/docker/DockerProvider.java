@@ -1,4 +1,4 @@
-package co.casterlabs.seatofpants.providers.impl.exec;
+package co.casterlabs.seatofpants.providers.impl.docker;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -8,7 +8,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-import co.casterlabs.rakurai.json.Rson;
 import co.casterlabs.rakurai.json.element.JsonObject;
 import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.providers.Instance;
@@ -18,15 +17,17 @@ import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
-public class ExecProvider implements InstanceProvider {
-    public static final FastLogger LOGGER = SeatOfPants.LOGGER.createChild("Exec Instance Provider");
+public class DockerProvider implements InstanceProvider {
+    public static final FastLogger LOGGER = SeatOfPants.LOGGER.createChild("Docker Instance Provider");
 
-    private String[] applicationToExec;
+    private String imageToUse;
+    private int portToMap;
 
     @SneakyThrows
     @Override
     public void loadConfig(JsonObject providerConfig) {
-        this.applicationToExec = Rson.DEFAULT.fromJson(providerConfig.get("exec"), String[].class);
+        this.imageToUse = providerConfig.getString("imageToUse");
+        this.portToMap = providerConfig.getNumber("portToMap").intValue();
     }
 
     @Override
@@ -41,12 +42,14 @@ public class ExecProvider implements InstanceProvider {
 
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
 
-            String[] command = this.applicationToExec.clone();
-            for (int idx = 0; idx < command.length; idx++) {
-                command[idx] = command[idx].replace("%port%", String.valueOf(port));
-            }
-
-            Process proc = new ProcessBuilder(command)
+            Process proc = new ProcessBuilder(
+                "docker",
+                "run",
+                "--rm",
+                "--name", idToUse,
+                "-p", String.format("%d:%d", port, this.portToMap),
+                this.imageToUse
+            )
                 .redirectError(Redirect.PIPE)
                 .redirectOutput(Redirect.PIPE)
                 .redirectInput(Redirect.PIPE)
@@ -76,10 +79,20 @@ public class ExecProvider implements InstanceProvider {
                 });
 
             return new Instance(idToUse, logger) {
+                @SneakyThrows
                 @Override
                 public void close() throws IOException {
                     this.logger.trace("Closed.");
-                    proc.destroyForcibly();
+                    new ProcessBuilder(
+                        "docker",
+                        "kill",
+                        idToUse
+                    )
+                        .redirectError(Redirect.PIPE)
+                        .redirectOutput(Redirect.PIPE)
+                        .redirectInput(Redirect.PIPE)
+                        .start()
+                        .waitFor();
                 }
 
                 @Override

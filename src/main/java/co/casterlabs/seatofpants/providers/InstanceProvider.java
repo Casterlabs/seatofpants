@@ -1,6 +1,7 @@
 package co.casterlabs.seatofpants.providers;
 
 import co.casterlabs.rakurai.json.element.JsonObject;
+import co.casterlabs.seatofpants.providers.impl.docker.DockerProvider;
 import co.casterlabs.seatofpants.providers.impl.exec.ExecProvider;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
@@ -20,7 +21,9 @@ public interface InstanceProvider {
 
     @AllArgsConstructor
     public static enum Type {
-        EXEC(ExecProvider.class);
+        EXEC(ExecProvider.class),
+        DOCKER(DockerProvider.class),
+        ;
 
         private final Class<? extends InstanceProvider> clazz;
 
