@@ -40,7 +40,7 @@ public class ExecProvider implements InstanceProvider {
                 command.add(part.replace("%port%", String.valueOf(port)));
             }
 
-            Process proc = new ProcessBuilder(command.toString())
+            Process proc = new ProcessBuilder(command.asList())
                 .redirectError(Redirect.PIPE)
                 .redirectOutput(Redirect.PIPE)
                 .redirectInput(Redirect.PIPE)
