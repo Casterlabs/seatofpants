@@ -87,6 +87,8 @@ public class Bootstrap {
             SeatOfPants.provider = SeatOfPants.config.providerType.newInstance();
             SeatOfPants.provider.loadConfig(SeatOfPants.config.providerConfig);
 
+            SeatOfPants.tick();
+
             // Start the daemon
             SeatOfPants.daemon = new Daemon();
             Thread

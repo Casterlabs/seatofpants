@@ -14,7 +14,11 @@ public abstract class Instance implements Closeable {
     public final @NonNull String id;
     protected final FastLogger logger;
 
+    private volatile int connections = 0;
+
     protected abstract Socket connect() throws IOException;
+
+    public abstract boolean isAlive();
 
     /**
      * @implNote This method blocks until the connection is terminated. The provided
@@ -41,6 +45,7 @@ public abstract class Instance implements Closeable {
 
     private final void doProxy(Socket socket, Socket instanceSocket) {
         try (socket; instanceSocket) {
+            this.connections++;
             socket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
             instanceSocket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
 
@@ -65,7 +70,13 @@ public abstract class Instance implements Closeable {
             instanceToSocket.join();
         } catch (InterruptedException | IOException e) {
             this.logger.severe("An error occurred whilst adopting:\n%s", e);
+        } finally {
+            this.connections--;
         }
+    }
+
+    public final int connections() {
+        return this.connections;
     }
 
 }

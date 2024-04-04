@@ -48,7 +48,7 @@ public class ExecProvider implements InstanceProvider {
 
             Thread
                 .ofVirtual()
-                .name("A Log thread")
+                .name("A log thread")
                 .start(() -> {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
                         String line;
@@ -59,7 +59,7 @@ public class ExecProvider implements InstanceProvider {
                 });
             Thread
                 .ofVirtual()
-                .name("A Log thread")
+                .name("A log thread")
                 .start(() -> {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getErrorStream()))) {
                         String line;
@@ -69,16 +69,31 @@ public class ExecProvider implements InstanceProvider {
                     } catch (IOException ignored) {}
                 });
 
+            Thread
+                .ofVirtual()
+                .name("A watchdog thread")
+                .start(() -> {
+                    try {
+                        proc.waitFor();
+                    } catch (InterruptedException ignored) {}
+                    SeatOfPants.tick();
+                });
+
             return new Instance(idToUse, logger) {
+                @Override
+                protected Socket connect() throws IOException {
+                    return new Socket("127.0.0.1", port);
+                }
+
+                @Override
+                public boolean isAlive() {
+                    return proc.isAlive();
+                }
+
                 @Override
                 public void close() throws IOException {
                     this.logger.trace("Closed.");
                     proc.destroyForcibly();
-                }
-
-                @Override
-                protected Socket connect() throws IOException {
-                    return new Socket("127.0.0.1", port);
                 }
             };
         } catch (IOException e) {
