@@ -7,7 +7,10 @@ import java.lang.ProcessBuilder.Redirect;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Map;
 
+import co.casterlabs.rakurai.json.Rson;
+import co.casterlabs.rakurai.json.TypeToken;
 import co.casterlabs.rakurai.json.element.JsonObject;
 import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.providers.Instance;
@@ -23,12 +26,18 @@ public class DockerProvider implements InstanceProvider {
 
     private String imageToUse;
     private int portToMap;
+    private Map<String, String> env;
 
     @SneakyThrows
     @Override
     public void loadConfig(JsonObject providerConfig) {
         this.imageToUse = providerConfig.getString("imageToUse");
         this.portToMap = providerConfig.getNumber("portToMap").intValue();
+        this.env = Rson.DEFAULT.fromJson(
+            providerConfig.get("env"),
+            new TypeToken<Map<String, String>>() {
+            }
+        );
     }
 
     @Override
@@ -47,6 +56,17 @@ public class DockerProvider implements InstanceProvider {
                 .add("docker", "run", "--rm")
                 .add("--name", idToUse)
                 .add("-p", String.format("%d:%d", port, this.portToMap));
+            for (Map.Entry<String, String> entry : env.entrySet()) {
+                command.add(
+                    "-e",
+                    String.format(
+                        "%s=%s",
+                        entry.getKey(),
+                        entry.getValue()
+                            .replace("%port%", String.valueOf(port))
+                    )
+                );
+            }
             command.add(this.imageToUse);
 
             Process proc = new ProcessBuilder(command.asList())
