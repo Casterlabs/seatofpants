@@ -1,14 +1,13 @@
-package co.casterlabs.seatofpants.providers.impl.docker;
+package co.casterlabs.seatofpants.providers.impl;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.Socket;
-import java.util.Map;
 
 import co.casterlabs.rakurai.json.Rson;
-import co.casterlabs.rakurai.json.TypeToken;
+import co.casterlabs.rakurai.json.annotating.JsonClass;
 import co.casterlabs.rakurai.json.element.JsonObject;
 import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.providers.Instance;
@@ -20,23 +19,26 @@ import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
-public class DockerProvider implements InstanceProvider {
-    public static final FastLogger LOGGER = SeatOfPants.LOGGER.createChild("Docker Instance Provider");
+public class ExecProvider implements InstanceProvider {
+    public static final FastLogger LOGGER = SeatOfPants.LOGGER.createChild("Exec Instance Provider");
 
-    private String imageToUse;
-    private int portToMap;
-    private Map<String, String> env;
+    private Config config;
+
+    @JsonClass(exposeAll = true)
+    private static class Config {
+        private String[] applicationToExec = {};
+
+    }
+
+    @Override
+    public JsonObject getConfig() {
+        return (JsonObject) Rson.DEFAULT.toJson(this.config);
+    }
 
     @SneakyThrows
     @Override
     public void loadConfig(JsonObject providerConfig) {
-        this.imageToUse = providerConfig.getString("imageToUse");
-        this.portToMap = providerConfig.getNumber("portToMap").intValue();
-        this.env = Rson.DEFAULT.fromJson(
-            providerConfig.get("env"),
-            new TypeToken<Map<String, String>>() {
-            }
-        );
+        this.config = Rson.DEFAULT.fromJson(providerConfig, Config.class);
     }
 
     @Override
@@ -45,23 +47,10 @@ public class DockerProvider implements InstanceProvider {
             int port = NetworkUtil.randomPort();
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
 
-            CommandBuilder command = new CommandBuilder()
-                .add("docker", "run")
-                .add("--rm")
-                .add("--name", idToUse)
-                .add("-p", String.format("%d:%d", port, this.portToMap));
-            for (Map.Entry<String, String> entry : env.entrySet()) {
-                command.add(
-                    "-e",
-                    String.format(
-                        "%s=%s",
-                        entry.getKey(),
-                        entry.getValue()
-                            .replace("%port%", String.valueOf(port))
-                    )
-                );
+            CommandBuilder command = new CommandBuilder();
+            for (String part : this.config.applicationToExec) {
+                command.add(part.replace("%port%", String.valueOf(port)));
             }
-            command.add(this.imageToUse);
 
             Process proc = new ProcessBuilder(command.asList())
                 .redirectError(Redirect.PIPE)
@@ -113,20 +102,10 @@ public class DockerProvider implements InstanceProvider {
                     return proc.isAlive();
                 }
 
-                @SneakyThrows
                 @Override
                 public void close() throws IOException {
                     this.logger.trace("Closed.");
-                    new ProcessBuilder(
-                        "docker",
-                        "kill",
-                        idToUse
-                    )
-                        .redirectError(Redirect.PIPE)
-                        .redirectOutput(Redirect.PIPE)
-                        .redirectInput(Redirect.PIPE)
-                        .start()
-                        .waitFor();
+                    proc.destroyForcibly();
                 }
             };
         } catch (IOException e) {

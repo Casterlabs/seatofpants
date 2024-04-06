@@ -1,12 +1,15 @@
-package co.casterlabs.seatofpants.providers.impl.exec;
+package co.casterlabs.seatofpants.providers.impl;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.Socket;
+import java.util.Collections;
+import java.util.Map;
 
 import co.casterlabs.rakurai.json.Rson;
+import co.casterlabs.rakurai.json.annotating.JsonClass;
 import co.casterlabs.rakurai.json.element.JsonObject;
 import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.providers.Instance;
@@ -18,15 +21,28 @@ import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
-public class ExecProvider implements InstanceProvider {
-    public static final FastLogger LOGGER = SeatOfPants.LOGGER.createChild("Exec Instance Provider");
+public class DockerProvider implements InstanceProvider {
+    public static final FastLogger LOGGER = SeatOfPants.LOGGER.createChild("Docker Instance Provider");
 
-    private String[] applicationToExec;
+    private Config config;
+
+    @JsonClass(exposeAll = true)
+    private static class Config {
+        private String imageToUse = "pottava/http-re:1.3";
+        private int portToMap = 8080;
+        private Map<String, String> env = Collections.emptyMap();
+
+    }
+
+    @Override
+    public JsonObject getConfig() {
+        return (JsonObject) Rson.DEFAULT.toJson(this.config);
+    }
 
     @SneakyThrows
     @Override
     public void loadConfig(JsonObject providerConfig) {
-        this.applicationToExec = Rson.DEFAULT.fromJson(providerConfig.get("exec"), String[].class);
+        this.config = Rson.DEFAULT.fromJson(providerConfig, Config.class);
     }
 
     @Override
@@ -35,10 +51,23 @@ public class ExecProvider implements InstanceProvider {
             int port = NetworkUtil.randomPort();
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
 
-            CommandBuilder command = new CommandBuilder();
-            for (String part : this.applicationToExec) {
-                command.add(part.replace("%port%", String.valueOf(port)));
+            CommandBuilder command = new CommandBuilder()
+                .add("docker", "run")
+                .add("--rm")
+                .add("--name", idToUse)
+                .add("-p", String.format("%d:%d", port, this.config.portToMap));
+            for (Map.Entry<String, String> entry : this.config.env.entrySet()) {
+                command.add(
+                    "-e",
+                    String.format(
+                        "%s=%s",
+                        entry.getKey(),
+                        entry.getValue()
+                            .replace("%port%", String.valueOf(port))
+                    )
+                );
             }
+            command.add(this.config.imageToUse);
 
             Process proc = new ProcessBuilder(command.asList())
                 .redirectError(Redirect.PIPE)
@@ -90,10 +119,20 @@ public class ExecProvider implements InstanceProvider {
                     return proc.isAlive();
                 }
 
+                @SneakyThrows
                 @Override
                 public void close() throws IOException {
                     this.logger.trace("Closed.");
-                    proc.destroyForcibly();
+                    new ProcessBuilder(
+                        "docker",
+                        "kill",
+                        idToUse
+                    )
+                        .redirectError(Redirect.PIPE)
+                        .redirectOutput(Redirect.PIPE)
+                        .redirectInput(Redirect.PIPE)
+                        .start()
+                        .waitFor();
                 }
             };
         } catch (IOException e) {

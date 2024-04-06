@@ -20,16 +20,6 @@ public class Bootstrap {
 
         reload();
 
-        try {
-            // Defaults...
-            Files.writeString(
-                CONFIG_FILE.toPath(),
-                Rson.DEFAULT
-                    .toJson(SeatOfPants.config)
-                    .toString(true)
-            );
-        } catch (IOException ignored) {}
-
         new FileWatcher(CONFIG_FILE) {
             @Override
             public void onChange() {
@@ -99,6 +89,15 @@ public class Bootstrap {
             SeatOfPants.provider.loadConfig(SeatOfPants.config.providerConfig); // We can reload the config safely tho.
             SeatOfPants.LOGGER.warn("SeatOfPants does not support changing the server port or the provider type while running. You will need to fully restart for any changes to take effect.");
         }
+
+        // Update the file with any defaults.
+        SeatOfPants.config.providerConfig = SeatOfPants.provider.getConfig();
+        Files.writeString(
+            CONFIG_FILE.toPath(),
+            Rson.DEFAULT
+                .toJson(SeatOfPants.config)
+                .toString(true)
+        );
     }
 
 }

@@ -23,6 +23,7 @@ public interface InstanceProvider {
     public static enum Type {
         EXEC(ExecProvider.class),
         DOCKER(DockerProvider.class),
+        ORACLE(OracleContainerInstancesProvider.class),
         ;
 
         private final Class<? extends InstanceProvider> clazz;
