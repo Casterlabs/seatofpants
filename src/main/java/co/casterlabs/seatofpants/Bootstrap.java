@@ -86,8 +86,6 @@ public class Bootstrap {
             SeatOfPants.provider = SeatOfPants.config.providerType.newInstance();
             SeatOfPants.provider.loadConfig(SeatOfPants.config.providerConfig);
 
-            SeatOfPants.tick();
-
             // Start the daemon
             SeatOfPants.daemon = new Daemon();
             Thread
@@ -98,6 +96,9 @@ public class Bootstrap {
             SeatOfPants.provider.loadConfig(SeatOfPants.config.providerConfig); // We can reload the config safely tho.
             SeatOfPants.LOGGER.warn("SeatOfPants does not support changing the server port or the provider type while running. You will need to fully restart for any changes to take effect.");
         }
+
+        // Create or destroy warm instances.
+        SeatOfPants.tick();
     }
 
 }
