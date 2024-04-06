@@ -1,13 +1,16 @@
 package co.casterlabs.seatofpants.providers;
 
 import co.casterlabs.rakurai.json.element.JsonObject;
-import co.casterlabs.seatofpants.providers.impl.docker.DockerProvider;
-import co.casterlabs.seatofpants.providers.impl.exec.ExecProvider;
+import co.casterlabs.seatofpants.providers.impl.DockerProvider;
+import co.casterlabs.seatofpants.providers.impl.ExecProvider;
+import co.casterlabs.seatofpants.providers.impl.OracleContainerInstancesProvider;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 
 public interface InstanceProvider {
+
+    public JsonObject getConfig();
 
     public void loadConfig(JsonObject providerConfig);
 

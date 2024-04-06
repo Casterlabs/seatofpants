@@ -42,6 +42,16 @@
 							<mainClass>co.casterlabs.seatofpants.Bootstrap</mainClass>
 						</transformer>
 					</transformers>
+					<filters>
+						<filter>
+							<artifact>*:*</artifact>
+							<excludes>
+								<exclude>META-INF/*.SF</exclude>
+								<exclude>META-INF/*.DSA</exclude>
+								<exclude>META-INF/*.RSA</exclude>
+							</excludes>
+						</filter>
+					</filters>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -91,6 +101,18 @@
 		</repository>
 	</repositories>
 
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.oracle.oci.sdk</groupId>
+				<artifactId>oci-java-sdk-bom</artifactId>
+				<version>3.39.0</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 		<!-- Code -->
 		<dependency>
@@ -106,11 +128,20 @@
 			<scope>provided</scope>
 		</dependency> <!-- For Eclipse users -->
 
-		<!-- Container Providers -->
+		<!-- Oracle Container Instances Provider -->
+		<dependency>
+			<groupId>com.oracle.oci.sdk</groupId>
+			<artifactId>oci-java-sdk-common-httpclient-jersey</artifactId>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.oracle.oci.sdk</groupId>
+			<artifactId>oci-java-sdk-core</artifactId>
+			<scope>compile</scope>
+		</dependency>
 		<dependency>
 			<groupId>com.oracle.oci.sdk</groupId>
 			<artifactId>oci-java-sdk-containerinstances</artifactId>
-			<version>3.38.0</version>
 			<scope>compile</scope>
 		</dependency>
 
