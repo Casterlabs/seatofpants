@@ -13,3 +13,5 @@ target/
 
 # Misc
 config.json
+oci-private.pem
+oci.config
