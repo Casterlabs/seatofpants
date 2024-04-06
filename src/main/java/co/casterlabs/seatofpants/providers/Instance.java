@@ -50,7 +50,7 @@ public abstract class Instance implements Closeable {
             instanceSocket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
 
             Thread socketToInstance = Thread
-                .ofVirtual()
+                .ofPlatform()
                 .name(String.format("TCP #%d->%s", socket.hashCode(), this.id))
                 .start(() -> {
                     try (socket; instanceSocket) {
@@ -58,7 +58,7 @@ public abstract class Instance implements Closeable {
                     } catch (IOException ignored) {}
                 });
             Thread instanceToSocket = Thread
-                .ofVirtual()
+                .ofPlatform()
                 .name(String.format("TCP #%d<-%s", socket.hashCode(), this.id))
                 .start(() -> {
                     try (socket; instanceSocket) {

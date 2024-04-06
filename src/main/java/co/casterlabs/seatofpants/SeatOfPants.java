@@ -28,6 +28,11 @@ public class SeatOfPants {
     private static Map<String, Instance> instances = new HashMap<>();
     public static final Set<Runnable> runOnClose = Collections.synchronizedSet(new HashSet<>());
 
+    private static final Object logicLock = new Object();
+    private static final Object creationLock = new Object();
+    private static final Object notifications = new Object();
+    private static volatile boolean isCreating = false;
+
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             for (Instance instance : new ArrayList<>(instances.values())) {
@@ -45,94 +50,130 @@ public class SeatOfPants {
         }));
     }
 
-    public static synchronized void handle(Socket socket) {
-        LOGGER.info("Incoming connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
-
+    public static void handle(Socket socket) {
         try {
-            Instance instance = null;
+            LOGGER.info("Incoming connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
 
-            // Look for an existing instance.
-            for (Instance existing : instances.values()) {
-                if (existing.isAlive() && existing.connections() < config.maxConnectionsPerInstance) {
-                    instance = existing;
-                    break;
+            // Look for an existing instance that has capacity.
+            synchronized (logicLock) {
+                for (Instance instance : instances.values()) {
+                    if (!instance.isAlive() || instance.connections() >= config.maxConnectionsPerInstance) continue;
+
+                    LOGGER.info("Using instance for request: %s", instance.id);
+
+                    Instance $instance_ptr = instance;
+                    Thread
+                        .ofPlatform()
+                        .name(String.format("TCP #%d", socket.hashCode()))
+                        .start(() -> {
+                            try (socket) {
+                                $instance_ptr.adopt(socket);
+                            } catch (Exception ignored) {} finally {
+                                LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
+                                tick();
+                            }
+                        });
+                    Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
+                    return; // DO NOT execute the below logic.
                 }
             }
 
-            // Create a new instance if we didn't find one.
-            if (instance == null) {
-                instance = createNewInstance();
+            // There was no instance ready...
+
+            if (isCreating) {
+                // Wait for another creation call to complete and then recurse.
+                LOGGER.debug("Waiting for an existing instance creation operation to complete (or for another instance to have availability).");
+                synchronized (notifications) {
+                    notifications.wait();
+                }
+            } else {
+                // Create a new instance since we didn't find one.
+                LOGGER.debug("Creating a new instance...");
+                createNewInstance();
             }
 
-            LOGGER.info("Using instance for request: %s", instance.id);
-
-            Instance $instance_ptr = instance;
-            Thread
-                .ofVirtual()
-                .name(String.format("TCP #%d", socket.hashCode()))
-                .start(() -> {
-                    try (socket) {
-                        $instance_ptr.adopt(socket);
-                    } catch (Exception ignored) {} finally {
-                        LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
-                        tick();
-                    }
-                });
-        } catch (InstanceCreationException e) {
+            // Recurse.
+            handle(socket);
+            return;
+        } catch (InstanceCreationException | InterruptedException e) {
             LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
             try {
                 socket.close(); // Make sure to close the socket since we failed.
             } catch (IOException ignored) {}
             SeatOfPants.LOGGER.fatal("Unable to create instance! THIS IS BAD!\n%s", e);
-        } finally {
-            Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
         }
     }
 
-    private static synchronized Instance createNewInstance() throws InstanceCreationException {
-        Instance instance = SeatOfPants.provider.create(String.format("SOP.%s.%s", config.sopId, UUID.randomUUID().toString()));
-        instances.put(instance.id, instance);
-        LOGGER.info("Created instance: %s", instance.id);
-        return instance;
-    }
-
-    public static synchronized void tick() {
-        // Prune any dead instances.
-        for (Instance existing : new ArrayList<>(instances.values())) {
-            if (!existing.isAlive()) {
-                instances.remove(existing.id);
-                LOGGER.info("Pruned instance: %s", existing.id);
-            }
-        }
-
-        int warmInstanceCount = 0;
-        for (Instance existing : new ArrayList<>(instances.values())) {
-            boolean hasCapacity = existing.connections() < config.maxConnectionsPerInstance;
-            if (!hasCapacity) continue;
-
-            // Register this one as warm.
-            warmInstanceCount++;
-
-            // Close any instances that we no longer need, keeping in mind the amount that
-            // we want to keep around.
-            if (warmInstanceCount > config.instancesToKeepWarm) {
-                instances.remove(existing.id);
-                try {
-                    existing.close();
-                } catch (IOException e) {
-                    SeatOfPants.LOGGER.warn("Error whilst closing instance:\n%s", e);
-                }
-                LOGGER.info("Closed instance: %s", existing.id);
-            }
-        }
-
-        // Spin up any instances we need to make the warm count be true.
-        for (; warmInstanceCount < config.instancesToKeepWarm; warmInstanceCount++) {
+    private static void createNewInstance() throws InstanceCreationException {
+        synchronized (creationLock) {
             try {
-                createNewInstance();
-            } catch (InstanceCreationException e) {
-                SeatOfPants.LOGGER.fatal("Unable to create instance! THIS IS BAD!\n%s", e);
+                isCreating = true;
+                Instance instance = SeatOfPants.provider.create(String.format("SOP.%s.%s", config.sopId, UUID.randomUUID().toString()));
+                instances.put(instance.id, instance);
+                LOGGER.info("Created instance: %s", instance.id);
+            } finally {
+                isCreating = false;
+                synchronized (notifications) {
+                    notifications.notifyAll();
+                }
             }
+        }
+    }
+
+    public static void tick() {
+        int warmInstanceCount = 0;
+
+        synchronized (logicLock) {
+            // Prune any dead instances.
+            for (Instance existing : new ArrayList<>(instances.values())) {
+                if (!existing.isAlive()) {
+                    instances.remove(existing.id);
+                    LOGGER.info("Pruned instance: %s", existing.id);
+                }
+            }
+
+            // Count the warm instances.
+            if (config.instancesToKeepWarm > 0) {
+                for (Instance existing : new ArrayList<>(instances.values())) {
+                    boolean hasCapacity = existing.connections() < config.maxConnectionsPerInstance;
+                    if (!hasCapacity) continue;
+
+                    // Register this one as warm.
+                    warmInstanceCount++;
+
+                    // Close any instances that we no longer need, keeping in mind the amount that
+                    // we want to keep around.
+                    if (warmInstanceCount > config.instancesToKeepWarm) {
+                        instances.remove(existing.id);
+                        try {
+                            existing.close();
+                        } catch (IOException e) {
+                            SeatOfPants.LOGGER.warn("Error whilst closing instance:\n%s", e);
+                        }
+                        LOGGER.info("Closed instance: %s", existing.id);
+                    }
+                }
+            }
+        }
+
+        synchronized (notifications) {
+            notifications.notifyAll();
+        }
+
+        if (warmInstanceCount < config.instancesToKeepWarm) {
+            int warmInstanceCountCopy = warmInstanceCount;
+            Thread.ofVirtual().start(() -> {
+                // Spin up any instances we need to make the warm count be true.
+                for (int iter = warmInstanceCountCopy; iter < config.instancesToKeepWarm; iter++) {
+                    try {
+                        createNewInstance();
+                    } catch (InstanceCreationException e) {
+                        SeatOfPants.LOGGER.fatal("Unable to create instance! THIS IS BAD!\n%s", e);
+                    }
+                }
+                // This may wind up creating more warm instances than necessary. But we won't
+                // kill them until the next NATURAL tick()
+            });
         }
     }
 

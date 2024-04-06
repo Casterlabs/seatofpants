@@ -17,7 +17,10 @@ public class Daemon {
 
             while (serverSocket.isBound()) {
                 Socket socket = serverSocket.accept();
-                SeatOfPants.handle(socket);
+                Thread.ofPlatform().start(() -> {
+                    // Don't block the socket loop.
+                    SeatOfPants.handle(socket);
+                });
             }
         }
     }
