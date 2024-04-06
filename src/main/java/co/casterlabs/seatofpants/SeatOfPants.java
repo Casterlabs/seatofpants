@@ -25,6 +25,8 @@ public class SeatOfPants {
     private static Map<String, Instance> instances = new HashMap<>();
 
     public static synchronized void handle(Socket socket) {
+        LOGGER.info("Incoming connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
+
         try {
             Instance instance = null;
 
@@ -48,14 +50,15 @@ public class SeatOfPants {
                 .ofVirtual()
                 .name(String.format("TCP #%d", socket.hashCode()))
                 .start(() -> {
-                    try {
-                        // socket close() is called in adopt().
+                    try (socket) {
                         $instance_ptr.adopt(socket);
-                    } finally {
+                    } catch (Exception ignored) {} finally {
+                        LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
                         tick();
                     }
                 });
         } catch (InstanceCreationException e) {
+            LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
             try {
                 socket.close(); // Make sure to close the socket since we failed.
             } catch (IOException ignored) {}
