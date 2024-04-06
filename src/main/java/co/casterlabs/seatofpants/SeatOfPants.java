@@ -3,8 +3,11 @@ package co.casterlabs.seatofpants;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import co.casterlabs.seatofpants.config.Config;
@@ -23,13 +26,21 @@ public class SeatOfPants {
     public static InstanceProvider provider;
 
     private static Map<String, Instance> instances = new HashMap<>();
+    public static final Set<Runnable> runOnClose = Collections.synchronizedSet(new HashSet<>());
 
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            for (Instance existing : new ArrayList<>(instances.values())) {
+            for (Instance instance : new ArrayList<>(instances.values())) {
                 try {
-                    existing.close();
-                } catch (IOException ignored) {}
+                    instance.close();
+                } catch (Throwable ignored) {}
+            }
+        }));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            for (Runnable toRun : new ArrayList<>(runOnClose)) {
+                try {
+                    toRun.run();
+                } catch (Throwable ignored) {}
             }
         }));
     }
@@ -74,7 +85,7 @@ public class SeatOfPants {
             } catch (IOException ignored) {}
             SeatOfPants.LOGGER.fatal("Unable to create instance! THIS IS BAD!\n%s", e);
         } finally {
-            tick();
+            Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
         }
     }
 

@@ -68,7 +68,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
         public float memoryGbs = 1;
 
         // Image
-        public String imageUrl = "docker.io/pottava/http-re:1.2";
+        public String imageUrl = "docker.io/crccheck/hello-world:latest";
         public Map<String, String> env = Collections.emptyMap();
         public long gracefulShutdownTimeoutSeconds = 30; // Seconds, max 300
 
@@ -77,7 +77,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
 
         // Network
         public String subnetId; // Open the VCN page, go to the desired subnet and copy the OCID.
-        public int port = 8080;
+        public int port = 8000;
 
     }
 
@@ -191,7 +191,18 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                 );
                 containerId = containerCreationResponse.getContainerInstance().getId();
                 logger.debug("containerId=%s", containerId);
+
             }
+
+            Runnable destroyInstance = () -> {
+                this.containerClient.deleteContainerInstance(
+                    DeleteContainerInstanceRequest.builder()
+                        .containerInstanceId(containerId)
+                        .build()
+                );
+            };
+            SeatOfPants.runOnClose.add(destroyInstance); // In case the deletion needs to occur before SOP knows about the instance.
+
             {
                 LifecycleState state;
                 String stateMessage;
@@ -235,6 +246,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                 logger.debug("privateIp=%s", privateIp);
             }
 
+            SeatOfPants.runOnClose.remove(destroyInstance); // SOP will take it from here :)
             logger.debug("Created! Took %.2fs.", (System.currentTimeMillis() - startedCreatingAt) / 1000d);
 
             return new Instance(idToUse, logger) {
@@ -278,11 +290,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                     }
 
                     try {
-                        containerClient.deleteContainerInstance(
-                            DeleteContainerInstanceRequest.builder()
-                                .containerInstanceId(containerId)
-                                .build()
-                        );
+                        destroyInstance.run();
                     } catch (Exception e) {
                         throw new IOException(e);
                     } finally {
