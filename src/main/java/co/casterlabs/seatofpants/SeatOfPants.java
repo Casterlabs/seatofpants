@@ -24,6 +24,16 @@ public class SeatOfPants {
 
     private static Map<String, Instance> instances = new HashMap<>();
 
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            for (Instance existing : new ArrayList<>(instances.values())) {
+                try {
+                    existing.close();
+                } catch (IOException ignored) {}
+            }
+        }));
+    }
+
     public static synchronized void handle(Socket socket) {
         LOGGER.info("Incoming connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
 
