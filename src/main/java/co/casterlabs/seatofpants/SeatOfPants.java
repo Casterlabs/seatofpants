@@ -7,8 +7,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import co.casterlabs.seatofpants.config.Config;
 import co.casterlabs.seatofpants.providers.Instance;
@@ -48,6 +50,17 @@ public class SeatOfPants {
                 } catch (Throwable ignored) {}
             }
         }));
+        Thread
+            .ofVirtual()
+            .name("Background tick() thread.")
+            .start(() -> {
+                while (true) {
+                    try {
+                        TimeUnit.MINUTES.sleep(2);
+                    } catch (InterruptedException ignored) {}
+                    tick();
+                }
+            });
     }
 
     public static void handle(Socket socket) {
@@ -56,18 +69,24 @@ public class SeatOfPants {
 
             // Look for an existing instance that has capacity.
             synchronized (logicLock) {
-                for (Instance instance : instances.values()) {
-                    if (!instance.isAlive() || instance.connections() >= config.maxConnectionsPerInstance) continue;
+                Optional<Instance> potentialInstance = new ArrayList<>(instances.values())
+                    .stream()
+                    .filter((i) -> i.isAlive())
+                    .filter((i) -> !i.isExpired())
+                    .filter((i) -> i.hasCapacity())
+                    .sorted((i1, i2) -> Long.compare(i1.age(), i2.age()) * -1) // Prefer younger instances.
+                    .findFirst();
 
+                if (potentialInstance.isPresent()) {
+                    Instance instance = potentialInstance.get();
                     LOGGER.info("Using instance for request: %s", instance.id);
 
-                    Instance $instance_ptr = instance;
                     Thread
                         .ofPlatform()
                         .name(String.format("TCP #%d", socket.hashCode()))
                         .start(() -> {
                             try (socket) {
-                                $instance_ptr.adopt(socket);
+                                instance.adopt(socket);
                             } catch (Exception ignored) {} finally {
                                 LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
                                 tick();
@@ -76,6 +95,7 @@ public class SeatOfPants {
                     Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
                     return; // DO NOT execute the below logic.
                 }
+                // Fall through...
             }
 
             // There was no instance ready...
@@ -121,37 +141,76 @@ public class SeatOfPants {
     }
 
     public static void tick() {
-        int warmInstanceCount = 0;
+        long warmInstanceCount = 0;
 
         synchronized (logicLock) {
             // Prune any dead instances.
-            for (Instance existing : new ArrayList<>(instances.values())) {
-                if (!existing.isAlive()) {
-                    instances.remove(existing.id);
-                    LOGGER.info("Pruned instance: %s", existing.id);
-                }
-            }
+            new ArrayList<>(instances.values())
+                .stream()
+                .filter((i) -> !i.isAlive())
+                .forEach((i) -> {
+                    instances.remove(i.id);
+                    LOGGER.info("Pruned instance: %s", i.id);
+                });
 
-            // Count the warm instances.
-            if (config.instancesToKeepWarm > 0) {
-                for (Instance existing : new ArrayList<>(instances.values())) {
-                    boolean hasCapacity = existing.connections() < config.maxConnectionsPerInstance;
-                    if (!hasCapacity) continue;
+            if (config.instanceMaxAgeMinutes > 0) {
+                // Prune any expired instances.
+                new ArrayList<>(instances.values())
+                    .stream()
+                    .filter((i) -> i.isExpired())
+                    .forEach((instance) -> {
+                        switch (config.expirationBehavior) {
+                            case WAIT_FOR_LAST_CONNECTIONS:
+                                if (instance.connections() > 0) {
+                                    return; // Continue to let it live.
+                                }
+                                break; // Kill code below.
 
-                    // Register this one as warm.
-                    warmInstanceCount++;
+                            case KILL_INSTANTLY:
+                                break; // Kill code below.
+                        }
 
-                    // Close any instances that we no longer need, keeping in mind the amount that
-                    // we want to keep around.
-                    if (warmInstanceCount > config.instancesToKeepWarm) {
-                        instances.remove(existing.id);
+                        // We're ready to kill it. See the above lines to see when this happens or
+                        // doesn't happen.
                         try {
-                            existing.close();
+                            instance.close();
                         } catch (IOException e) {
                             SeatOfPants.LOGGER.warn("Error whilst closing instance:\n%s", e);
+                        } finally {
+                            instances.remove(instance.id);
                         }
-                        LOGGER.info("Closed instance: %s", existing.id);
-                    }
+                        LOGGER.info("Killed expired instance: %s", instance.id);
+                    });
+            }
+
+            if (config.instancesToKeepWarm > 0) {
+                // Count the warm instances.
+                warmInstanceCount = new ArrayList<>(instances.values())
+                    .stream()
+                    .filter((i) -> !i.isExpired())
+                    .filter((i) -> !i.isAboutToExpire()) // Don't count instances that are about to expire.
+                    .filter((i) -> i.hasCapacity())
+                    .count();
+
+                if (warmInstanceCount > config.instancesToKeepWarm) {
+                    // Close any instances that we no longer need, keeping in mind the amount that
+                    // we want to keep around.
+                    long overProvisionedCount = warmInstanceCount - config.instancesToKeepWarm;
+                    new ArrayList<>(instances.values())
+                        .stream()
+                        .filter((i) -> i.connections() == 0)
+                        .sorted((i1, i2) -> Long.compare(i1.age(), i2.age())) // Kill the older instances first.
+                        .limit(overProvisionedCount)
+                        .forEach((instance) -> {
+                            try {
+                                instance.close();
+                            } catch (IOException e) {
+                                SeatOfPants.LOGGER.warn("Error whilst closing instance:\n%s", e);
+                            } finally {
+                                instances.remove(instance.id);
+                            }
+                            LOGGER.info("Closed instance: %s", instance.id);
+                        });
                 }
             }
         }
@@ -161,10 +220,10 @@ public class SeatOfPants {
         }
 
         if (warmInstanceCount < config.instancesToKeepWarm) {
-            int warmInstanceCountCopy = warmInstanceCount;
+            int $warmInstanceCount_ptr = (int) warmInstanceCount;
             Thread.ofVirtual().start(() -> {
-                // Spin up any instances we need to make the warm count be true.
-                for (int iter = warmInstanceCountCopy; iter < config.instancesToKeepWarm; iter++) {
+                // Spin up any instances we need to make the warm count be satisfied.
+                for (int iter = $warmInstanceCount_ptr; iter < config.instancesToKeepWarm; iter++) {
                     try {
                         createNewInstance();
                     } catch (InstanceCreationException e) {

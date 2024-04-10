@@ -28,5 +28,13 @@ public class Config {
 
     public int maxConnectionsPerInstance = 1;
     public int instancesToKeepWarm = 1;
+    public long instanceMaxAgeMinutes = -1; // -1 to disable.
+    public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
+
+    public static enum InstanceExpireBehavior {
+        WAIT_FOR_LAST_CONNECTIONS,
+        KILL_INSTANTLY,
+        ;
+    }
 
 }

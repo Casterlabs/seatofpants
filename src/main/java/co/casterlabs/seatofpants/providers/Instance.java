@@ -3,6 +3,7 @@ package co.casterlabs.seatofpants.providers;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.concurrent.TimeUnit;
 
 import co.casterlabs.seatofpants.SeatOfPants;
 import lombok.NonNull;
@@ -11,6 +12,8 @@ import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
 @RequiredArgsConstructor
 public abstract class Instance implements Closeable {
+    private final long createdAt = System.currentTimeMillis();
+
     public final @NonNull String id;
     protected final FastLogger logger;
 
@@ -77,6 +80,35 @@ public abstract class Instance implements Closeable {
 
     public final int connections() {
         return this.connections;
+    }
+
+    public final long age() {
+        return System.currentTimeMillis() - this.createdAt;
+    }
+
+    public final boolean isExpired() {
+        if (SeatOfPants.config.instanceMaxAgeMinutes == -1) return false;
+
+        long maxAgeMs = TimeUnit.MINUTES.toMillis(SeatOfPants.config.instanceMaxAgeMinutes);
+        long myAge = this.age();
+
+        return myAge >= maxAgeMs;
+    }
+
+    public final boolean isAboutToExpire() {
+        final int aboutToMinutes = 3;
+
+        if (SeatOfPants.config.instanceMaxAgeMinutes == -1) return false;
+        if (SeatOfPants.config.instanceMaxAgeMinutes <= aboutToMinutes) return false; // Our "about to" logic won't work. So we won't do it.
+
+        long maxAgeMs = TimeUnit.MINUTES.toMillis(SeatOfPants.config.instanceMaxAgeMinutes - aboutToMinutes);
+        long myAge = this.age();
+
+        return myAge >= maxAgeMs;
+    }
+
+    public final boolean hasCapacity() {
+        return this.connections >= SeatOfPants.config.maxConnectionsPerInstance;
     }
 
 }
