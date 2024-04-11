@@ -19,7 +19,7 @@ import co.casterlabs.seatofpants.providers.InstanceProvider;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
 public class SeatOfPants {
-    public static final int SO_TIMEOUT = 2 * 60 * 1000; // 2 minutes
+    public static final int SO_TIMEOUT = (int) TimeUnit.MINUTES.toMillis(3);
     public static final FastLogger LOGGER = new FastLogger();
 
     public static Config config;
