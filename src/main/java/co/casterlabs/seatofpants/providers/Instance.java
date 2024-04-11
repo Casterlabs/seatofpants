@@ -108,7 +108,7 @@ public abstract class Instance implements Closeable {
     }
 
     public final boolean hasCapacity() {
-        return this.connections >= SeatOfPants.config.maxConnectionsPerInstance;
+        return this.connections < SeatOfPants.config.maxConnectionsPerInstance;
     }
 
 }
