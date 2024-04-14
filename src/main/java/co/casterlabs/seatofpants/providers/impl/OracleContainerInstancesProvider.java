@@ -3,8 +3,10 @@ package co.casterlabs.seatofpants.providers.impl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -17,11 +19,11 @@ import com.oracle.bmc.auth.SimplePrivateKeySupplier;
 import com.oracle.bmc.containerinstances.ContainerInstanceClient;
 import com.oracle.bmc.containerinstances.model.ContainerInstance;
 import com.oracle.bmc.containerinstances.model.ContainerInstance.LifecycleState;
+import com.oracle.bmc.containerinstances.model.CreateBasicImagePullSecretDetails;
 import com.oracle.bmc.containerinstances.model.CreateContainerDetails;
 import com.oracle.bmc.containerinstances.model.CreateContainerInstanceDetails;
 import com.oracle.bmc.containerinstances.model.CreateContainerInstanceShapeConfigDetails;
 import com.oracle.bmc.containerinstances.model.CreateContainerVnicDetails;
-import com.oracle.bmc.containerinstances.model.CreateVaultImagePullSecretDetails;
 import com.oracle.bmc.containerinstances.requests.CreateContainerInstanceRequest;
 import com.oracle.bmc.containerinstances.requests.DeleteContainerInstanceRequest;
 import com.oracle.bmc.containerinstances.requests.GetContainerInstanceRequest;
@@ -72,8 +74,9 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
         public Map<String, String> env = Collections.emptyMap();
         public long gracefulShutdownTimeoutSeconds = 30; // Seconds, max 300
 
-        public String registrySecretEndpoint; /* Optional, https://docs.oracle.com/en-us/iaas/Content/container-instances/vault-secrets-image-authorization.htm */
-        public String registrySecretId; // See above^
+        public String registryAuthEndpoint; // Usually docker.io or something like iad.ocir.io.
+        public String registryAuthUsername; /* Optional, https://docs.oracle.com/en-us/iaas/api/#/en/container-instances/20210415/datatypes/CreateBasicImagePullSecretDetails */
+        public String registryAuthPassword; // See above^
 
         // Network
         public String subnetId; // Open the VCN page, go to the desired subnet and copy the OCID.
@@ -171,13 +174,14 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                     .gracefulShutdownTimeoutInSeconds(this.config.gracefulShutdownTimeoutSeconds)
                     .containerRestartPolicy(ContainerInstance.ContainerRestartPolicy.Never);
 
-                if (this.config.registrySecretEndpoint != null && this.config.registrySecretId != null) {
+                if (this.config.registryAuthEndpoint != null && this.config.registryAuthUsername != null && this.config.registryAuthPassword != null) {
                     createContainerInstanceDetails.imagePullSecrets(
                         new ArrayList<>(
                             Arrays.asList(
-                                CreateVaultImagePullSecretDetails.builder()
-                                    .secretId(this.config.registrySecretId)
-                                    .registryEndpoint(this.config.registrySecretEndpoint)
+                                CreateBasicImagePullSecretDetails.builder()
+                                    .registryEndpoint(this.config.registryAuthEndpoint)
+                                    .username(Base64.getEncoder().encodeToString(this.config.registryAuthUsername.getBytes(StandardCharsets.UTF_8)))
+                                    .password(Base64.getEncoder().encodeToString(this.config.registryAuthPassword.getBytes(StandardCharsets.UTF_8)))
                                     .build()
                             )
                         )
