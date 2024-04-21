@@ -16,6 +16,7 @@ import co.casterlabs.seatofpants.config.Config;
 import co.casterlabs.seatofpants.providers.Instance;
 import co.casterlabs.seatofpants.providers.InstanceCreationException;
 import co.casterlabs.seatofpants.providers.InstanceProvider;
+import co.casterlabs.seatofpants.util.Watchdog;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
 public class SeatOfPants {
@@ -70,10 +71,17 @@ public class SeatOfPants {
             // Look for an existing instance that has capacity.
             synchronized (logicLock) {
                 Optional<Instance> potentialInstance = new ArrayList<>(instances.values())
-                    .stream()
-                    .filter((i) -> i.isAlive())
+                    .parallelStream()
                     .filter((i) -> !i.isExpired())
                     .filter((i) -> i.hasCapacity())
+                    .filter((i) -> {
+                        try (Watchdog wd = new Watchdog(5000)) {
+                            return i.isAlive();
+                        } catch (Exception e) {
+                            LOGGER.trace(e);
+                            return false;
+                        }
+                    })
                     .sorted((i1, i2) -> Long.compare(i1.age(), i2.age()) * -1) // Prefer younger instances.
                     .findFirst();
 
@@ -126,11 +134,14 @@ public class SeatOfPants {
 
     private static void createNewInstance() throws InstanceCreationException {
         synchronized (creationLock) {
-            try {
+            try (Watchdog wd = new Watchdog(config.providerMaxCreationTime)) {
                 isCreating = true;
-                Instance instance = SeatOfPants.provider.create(String.format("SOP.%s.%s", config.sopId, UUID.randomUUID().toString()));
-                instances.put(instance.id, instance);
-                LOGGER.info("Created instance: %s", instance.id);
+                String id = String.format("SOP.%s.%s", config.sopId, UUID.randomUUID().toString());
+                LOGGER.info("Creating instance... (will be %s)", id);
+
+                Instance instance = SeatOfPants.provider.create(id);
+                instances.put(id, instance);
+                LOGGER.info("Created instance: %s", id);
             } finally {
                 isCreating = false;
                 synchronized (notifications) {
@@ -146,8 +157,15 @@ public class SeatOfPants {
         synchronized (logicLock) {
             // Prune any dead instances.
             new ArrayList<>(instances.values())
-                .stream()
-                .filter((i) -> !i.isAlive())
+                .parallelStream()
+                .filter((i) -> {
+                    try (Watchdog wd = new Watchdog(15000)) {
+                        return !i.isAlive();
+                    } catch (Exception e) {
+                        LOGGER.trace(e);
+                        return false;
+                    }
+                })
                 .forEach((i) -> {
                     instances.remove(i.id);
                     LOGGER.info("Pruned instance: %s", i.id);
@@ -156,7 +174,7 @@ public class SeatOfPants {
             if (config.instanceMaxAgeMinutes > 0) {
                 // Prune any expired instances.
                 new ArrayList<>(instances.values())
-                    .stream()
+                    .parallelStream()
                     .filter((i) -> i.isExpired())
                     .forEach((instance) -> {
                         switch (config.expirationBehavior) {

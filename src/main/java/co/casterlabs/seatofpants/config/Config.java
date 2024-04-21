@@ -26,6 +26,8 @@ public class Config {
     public int providerMaxRetries = 500;
     public long providerRetryTimeout = 100;
 
+    public long providerMaxCreationTime = 120 * 1000;
+
     public int maxConnectionsPerInstance = 1;
     public int instancesToKeepWarm = 1;
     public long instanceMaxAgeMinutes = -1; // -1 to disable.

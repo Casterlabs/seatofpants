@@ -116,6 +116,8 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
 
     @Override
     public Instance create(@NonNull String idToUse) throws InstanceCreationException {
+        Runnable destroyInstance = null;
+
         try {
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
 
@@ -198,7 +200,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
 
             }
 
-            Runnable destroyInstance = () -> {
+            destroyInstance = () -> {
                 this.containerClient.deleteContainerInstance(
                     DeleteContainerInstanceRequest.builder()
                         .containerInstanceId(containerId)
@@ -211,7 +213,6 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                 LifecycleState state;
                 String stateMessage;
                 ContainerInstance updated;
-                int spinCount = 1;
                 do {
                     updated = this.containerClient.getContainerInstance(
                         GetContainerInstanceRequest.builder()
@@ -222,10 +223,9 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                     state = updated
                         .getLifecycleState();
                     stateMessage = updated.getLifecycleDetails();
-//                    logger.trace("Waiting for container: %s (%s)", state, stateMessage);
+                    logger.trace("Waiting for container: %s (%s)", state, stateMessage);
 
-                    Thread.sleep(Math.min(500 * spinCount, 5000)); // A backoff, capped at 5s.
-                    spinCount++;
+                    Thread.sleep(5000); // Check every 5s for a new status.
                 } while (state == LifecycleState.Creating);
 
                 if (state != LifecycleState.Active) {
@@ -253,6 +253,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
             SeatOfPants.runOnClose.remove(destroyInstance); // SOP will take it from here :)
             logger.debug("Created! Took %.2fs.", (System.currentTimeMillis() - startedCreatingAt) / 1000d);
 
+            Runnable $destroyInstance_ptr = destroyInstance;
             return new Instance(idToUse, logger) {
                 private boolean hasBeenDestroyedAlready = false;
 
@@ -294,7 +295,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                     }
 
                     try {
-                        destroyInstance.run();
+                        $destroyInstance_ptr.run();
                     } catch (Exception e) {
                         throw new IOException(e);
                     } finally {
@@ -303,6 +304,9 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                 }
             };
         } catch (Exception e) {
+            if (destroyInstance != null) {
+                Thread.ofVirtual().start(destroyInstance);
+            }
             throw new InstanceCreationException(e);
         }
     }
