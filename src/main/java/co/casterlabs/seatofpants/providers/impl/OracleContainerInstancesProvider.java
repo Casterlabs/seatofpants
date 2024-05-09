@@ -32,6 +32,7 @@ import com.oracle.bmc.containerinstances.responses.GetContainerInstanceResponse;
 import com.oracle.bmc.core.VirtualNetworkClient;
 import com.oracle.bmc.core.requests.GetVnicRequest;
 import com.oracle.bmc.core.responses.GetVnicResponse;
+import com.oracle.bmc.http.client.jersey.JerseyClientProperties;
 
 import co.casterlabs.rakurai.json.Rson;
 import co.casterlabs.rakurai.json.annotating.JsonClass;
@@ -107,10 +108,17 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
         this.containerClient = ContainerInstanceClient
             .builder()
             .endpoint(this.config.containerInstanceEndpoint)
+            .clientConfigurator(builder -> {
+                builder.property(JerseyClientProperties.USE_APACHE_CONNECTOR, false);
+            })
             .build(provider);
+
         this.vnicClient = VirtualNetworkClient
             .builder()
             .endpoint(this.config.coreApiEndpoint)
+            .clientConfigurator(builder -> {
+                builder.property(JerseyClientProperties.USE_APACHE_CONNECTOR, false);
+            })
             .build(provider);
     }
 
