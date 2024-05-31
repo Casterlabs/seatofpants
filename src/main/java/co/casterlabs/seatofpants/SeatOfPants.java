@@ -179,7 +179,7 @@ public class SeatOfPants {
                     .forEach((instance) -> {
                         switch (config.expirationBehavior) {
                             case WAIT_FOR_LAST_CONNECTIONS:
-                                if (instance.connections() > 0) {
+                                if (instance.connectionsCount() > 0) {
                                     return; // Continue to let it live.
                                 }
                                 break; // Kill code below.
@@ -216,7 +216,7 @@ public class SeatOfPants {
                     long overProvisionedCount = warmInstanceCount - config.instancesToKeepWarm;
                     new ArrayList<>(instances.values())
                         .stream()
-                        .filter((i) -> i.connections() == 0)
+                        .filter((i) -> i.connectionsCount() == 0)
                         .sorted((i1, i2) -> Long.compare(i1.age(), i2.age())) // Kill the older instances first.
                         .limit(overProvisionedCount)
                         .forEach((instance) -> {

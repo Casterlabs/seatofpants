@@ -17,7 +17,7 @@ public abstract class Instance implements Closeable {
     public final @NonNull String id;
     protected final FastLogger logger;
 
-    private volatile int connections = 0;
+    private volatile int connectionsCount = 0;
 
     protected abstract Socket connect() throws IOException;
 
@@ -48,7 +48,7 @@ public abstract class Instance implements Closeable {
 
     private final void doProxy(Socket socket, Socket instanceSocket) {
         try (socket; instanceSocket) {
-            this.connections++;
+            this.connectionsCount++;
             socket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
             instanceSocket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
 
@@ -74,12 +74,12 @@ public abstract class Instance implements Closeable {
         } catch (InterruptedException | IOException e) {
             this.logger.severe("An error occurred whilst adopting:\n%s", e);
         } finally {
-            this.connections--;
+            this.connectionsCount--;
         }
     }
 
-    public final int connections() {
-        return this.connections;
+    public final int connectionsCount() {
+        return this.connectionsCount;
     }
 
     public final long age() {
@@ -108,7 +108,7 @@ public abstract class Instance implements Closeable {
     }
 
     public final boolean hasCapacity() {
-        return this.connections < SeatOfPants.config.maxConnectionsPerInstance;
+        return this.connectionsCount < SeatOfPants.config.maxConnectionsPerInstance;
     }
 
 }
