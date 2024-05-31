@@ -33,6 +33,8 @@ public class Config {
     public long instanceMaxAgeMinutes = -1; // -1 to disable.
     public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
 
+    public int apiPort = -1; // -1 to disable.
+
     public static enum InstanceExpireBehavior {
         WAIT_FOR_LAST_CONNECTIONS,
         KILL_INSTANTLY,

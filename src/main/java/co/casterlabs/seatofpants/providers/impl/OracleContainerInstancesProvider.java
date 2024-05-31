@@ -271,6 +271,11 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                 }
 
                 @Override
+                public String getAddress() {
+                    return String.format("%s:%d", privateIp, config.port);
+                }
+
+                @Override
                 public boolean isAlive() {
                     if (this.hasBeenDestroyedAlready) {
                         return false;

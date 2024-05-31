@@ -21,6 +21,8 @@ public abstract class Instance implements Closeable {
 
     protected abstract Socket connect() throws IOException;
 
+    public abstract String getAddress();
+
     public abstract boolean isAlive();
 
     /**

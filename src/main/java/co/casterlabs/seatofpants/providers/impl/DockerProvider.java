@@ -115,6 +115,11 @@ public class DockerProvider implements InstanceProvider {
                 }
 
                 @Override
+                public String getAddress() {
+                    return String.format("127.0.0.1:%d", port);
+                }
+
+                @Override
                 public boolean isAlive() {
                     return proc.isAlive();
                 }

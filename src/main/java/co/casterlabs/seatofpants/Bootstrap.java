@@ -92,6 +92,12 @@ public class Bootstrap {
                 .ofPlatform()
                 .name("Daemon")
                 .start(SeatOfPants.daemon::start);
+
+            SeatOfPants.apiDaemon = new APIDaemon();
+            Thread
+                .ofPlatform()
+                .name("APIDaemon")
+                .start(SeatOfPants.apiDaemon::start);
         } else {
             SeatOfPants.provider.loadConfig(SeatOfPants.config.providerConfig); // We can reload the config safely tho.
             SeatOfPants.LOGGER.warn("SeatOfPants does not support changing the server port or the provider type while running. You will need to fully restart for any changes to take effect.");

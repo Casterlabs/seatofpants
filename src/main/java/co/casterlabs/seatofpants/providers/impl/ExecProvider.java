@@ -49,7 +49,10 @@ public class ExecProvider implements InstanceProvider {
 
             CommandBuilder command = new CommandBuilder();
             for (String part : this.config.applicationToExec) {
-                command.add(part.replace("%port%", String.valueOf(port)));
+                command.add(
+                    part
+                        .replace("%port%", String.valueOf(port))
+                );
             }
 
             Process proc = new ProcessBuilder(command.asList())
@@ -95,6 +98,11 @@ public class ExecProvider implements InstanceProvider {
                 @Override
                 protected Socket connect() throws IOException {
                     return new Socket("127.0.0.1", port);
+                }
+
+                @Override
+                public String getAddress() {
+                    return String.format("127.0.0.1:%d", port);
                 }
 
                 @Override

@@ -145,6 +145,14 @@
 			<scope>compile</scope>
 		</dependency>
 
+		<!-- Webhooks -->
+		<dependency>
+			<groupId>co.casterlabs</groupId>
+			<artifactId>Rakurai-Http-Server</artifactId>
+			<version>2.1.7</version>
+			<scope>compile</scope>
+		</dependency>
+
 		<!-- Utils -->
 		<dependency>
 			<groupId>co.casterlabs</groupId>

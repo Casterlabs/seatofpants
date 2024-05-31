@@ -6,11 +6,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import co.casterlabs.seatofpants.config.Config;
 import co.casterlabs.seatofpants.providers.Instance;
@@ -25,6 +27,7 @@ public class SeatOfPants {
 
     public static Config config;
     public static Daemon daemon;
+    public static APIDaemon apiDaemon;
     public static Heartbeat heartbeat;
     public static InstanceProvider provider;
 
@@ -130,6 +133,27 @@ public class SeatOfPants {
             } catch (IOException ignored) {}
             SeatOfPants.LOGGER.fatal("Unable to create instance! THIS IS BAD!\n%s", e);
         }
+    }
+
+    public static List<String> getInstanceAddresses() {
+        return new ArrayList<>(instances.values())
+            .parallelStream()
+            .filter((i) -> {
+                try (Watchdog wd = new Watchdog(5000)) {
+                    return i.isAlive();
+                } catch (Exception e) {
+                    LOGGER.trace(e);
+                    return false;
+                }
+            })
+            .map((i) -> i.getAddress())
+            .toList();
+    }
+
+    public static long getConnectionCount() {
+        return new ArrayList<>(instances.values())
+            .parallelStream()
+            .collect(Collectors.summingLong((i) -> i.connectionsCount()));
     }
 
     private static void createNewInstance() throws InstanceCreationException {
