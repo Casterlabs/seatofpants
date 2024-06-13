@@ -209,24 +209,33 @@ public class SeatOfPants {
                     // See if we can save money by closing instances with 0 connections.
                     // We don't want to kill anything that has >0 because we don't know how the app
                     // handles itself.
-                    new ArrayList<>(instances.values())
+                    List<Instance> canBeDeleted = new ArrayList<>(instances.values())
                         .parallelStream()
                         .filter((i) -> i.isAlive())
                         .filter((i) -> i.connectionsCount() == 0)
                         .sorted((i1, i2) -> Long.compare(i1.age(), i2.age())) // Prefer older instances.
-                        .findFirst() // Only kill one at a time. (this fixes some logic bugs)
-                        .ifPresent((instance) -> {
-                            Thread.ofPlatform().start(() -> {
-                                try {
-                                    instance.close();
-                                } catch (Throwable t) {
-                                    SeatOfPants.LOGGER.warn("Error whilst closing instance:\n%s", t);
-                                } finally {
-                                    instances.remove(instance.id);
-                                }
-                                LOGGER.info("Killed unused instance: %s", instance.id);
-                            });
+                        .collect(Collectors.toList());
+                    long availableConnectionCountCopy = availableConnectionCount;
+
+                    for (Instance instance : canBeDeleted) {
+                        availableConnectionCountCopy -= config.maxConnectionsPerInstance;
+
+                        if (availableConnectionCountCopy < requiredFreeConnections) {
+                            // Let's not kill our reserve capacity.
+                            break;
+                        }
+
+                        Thread.ofPlatform().start(() -> {
+                            try {
+                                instance.close();
+                            } catch (Throwable t) {
+                                SeatOfPants.LOGGER.warn("Error whilst closing instance:\n%s", t);
+                            } finally {
+                                instances.remove(instance.id);
+                            }
+                            LOGGER.info("Killed unused instance: %s", instance.id);
                         });
+                    }
                 }
             }
 
