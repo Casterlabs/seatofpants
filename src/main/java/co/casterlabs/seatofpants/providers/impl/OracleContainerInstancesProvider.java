@@ -263,8 +263,6 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
 
             Runnable $destroyInstance_ptr = destroyInstance;
             return new Instance(idToUse, logger) {
-                private boolean hasBeenDestroyedAlready = false;
-
                 @Override
                 protected Socket connect() throws IOException {
                     return new Socket(privateIp, config.port);
@@ -276,11 +274,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                 }
 
                 @Override
-                public boolean isAlive() {
-                    if (this.hasBeenDestroyedAlready) {
-                        return false;
-                    }
-
+                protected boolean isAlive0() {
                     GetContainerInstanceResponse current = containerClient.getContainerInstance(
                         GetContainerInstanceRequest.builder()
                             .containerInstanceId(containerId)
@@ -293,26 +287,18 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
 
                     if (!alive) {
                         // Do cleanup.
-                        try {
-                            this.close();
-                        } catch (IOException ignored) {}
+                        this.close();
                     }
 
                     return alive;
                 }
 
                 @Override
-                public void close() throws IOException {
-                    if (this.hasBeenDestroyedAlready) {
-                        return;
-                    }
-
+                protected void close0() {
                     try {
                         $destroyInstance_ptr.run();
                     } catch (Exception e) {
-                        throw new IOException(e);
-                    } finally {
-                        this.hasBeenDestroyedAlready = true;
+                        this.logger.severe("Error whilst destroying instance:\n%s", e);
                     }
                 }
             };

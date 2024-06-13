@@ -120,13 +120,13 @@ public class DockerProvider implements InstanceProvider {
                 }
 
                 @Override
-                public boolean isAlive() {
+                protected boolean isAlive0() {
                     return proc.isAlive();
                 }
 
                 @SneakyThrows
                 @Override
-                public void close() throws IOException {
+                protected void close0() {
                     this.logger.trace("Closed.");
                     new ProcessBuilder(
                         "docker",

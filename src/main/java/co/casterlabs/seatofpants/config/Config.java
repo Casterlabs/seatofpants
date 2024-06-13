@@ -29,7 +29,7 @@ public class Config {
     public long providerMaxCreationTime = 120 * 1000;
 
     public int maxConnectionsPerInstance = 1;
-    public int instancesToKeepWarm = 1;
+    public double instanceWarmRatio = 1;
     public long instanceMaxAgeMinutes = -1; // -1 to disable.
     public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
 

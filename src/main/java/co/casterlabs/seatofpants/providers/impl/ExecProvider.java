@@ -106,12 +106,12 @@ public class ExecProvider implements InstanceProvider {
                 }
 
                 @Override
-                public boolean isAlive() {
+                protected boolean isAlive0() {
                     return proc.isAlive();
                 }
 
                 @Override
-                public void close() throws IOException {
+                protected void close0() {
                     this.logger.trace("Closed.");
                     proc.destroyForcibly();
                 }
