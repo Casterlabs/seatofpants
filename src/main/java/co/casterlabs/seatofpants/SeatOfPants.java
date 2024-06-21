@@ -147,6 +147,10 @@ public class SeatOfPants {
 
     private static void createNewInstance() throws InstanceCreationException {
         try (Watchdog wd = new Watchdog(config.providerMaxCreationTime)) {
+            if (config.maxInstancesLimit != -1 && instances.size() >= config.maxInstancesLimit) {
+                return; // Don't create another.
+            }
+
             String id = String.format("SOP.%s.%s", config.sopId, UUID.randomUUID().toString());
             LOGGER.info("Creating instance... (will be %s)", id);
 
