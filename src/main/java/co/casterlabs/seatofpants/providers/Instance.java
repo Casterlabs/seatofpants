@@ -68,9 +68,11 @@ public abstract class Instance implements Closeable {
 
         Thread
             .ofPlatform()
-            .name(String.format("TCP #%d--%s", clientSocket.hashCode(), this.id))
+            .name(String.format("TCP #%d->%s", clientSocket.hashCode(), this.id))
             .start(() -> {
                 try {
+                    clientSocket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
+
                     int retryCount = 0;
                     while (!clientSocket.isClosed()) {
                         try (Socket instanceSocket = this.connect()) {
@@ -105,27 +107,26 @@ public abstract class Instance implements Closeable {
             });
     }
 
-    private final void doProxy(Socket clientSocket, Socket instanceSocket) throws IOException, InterruptedException {
-        Thread clientToInstance = Thread
-            .ofPlatform()
-            .name(String.format("TCP #%d->%s", clientSocket.hashCode(), this.id))
-            .start(() -> {
-                try {
-                    clientSocket.getInputStream().transferTo(instanceSocket.getOutputStream());
-                } catch (IOException ignored) {}
-            });
-        Thread instanceToClient = Thread
-            .ofPlatform()
-            .name(String.format("TCP #%d<-%s", clientSocket.hashCode(), this.id))
-            .start(() -> {
-                try {
-                    instanceSocket.getInputStream().transferTo(clientSocket.getOutputStream());
-                } catch (IOException ignored) {}
-            });
-
+    private final void doProxy(Socket clientSocket, Socket instanceSocket) throws IOException {
         try (clientSocket; instanceSocket) {
-            clientToInstance.join();
-            instanceToClient.join();
+            Thread current = Thread.currentThread();
+
+            Thread instanceToClient = Thread
+                .ofPlatform()
+                .name(String.format("TCP #%d<-%s", clientSocket.hashCode(), this.id))
+                .start(() -> {
+                    try {
+                        instanceSocket.getInputStream().transferTo(clientSocket.getOutputStream());
+                    } catch (IOException ignored) {} finally {
+                        current.interrupt();
+                    }
+                });
+
+            try {
+                clientSocket.getInputStream().transferTo(instanceSocket.getOutputStream());
+            } catch (IOException ignored) {} finally {
+                instanceToClient.interrupt();
+            }
         }
     }
 

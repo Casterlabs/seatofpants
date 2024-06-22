@@ -17,7 +17,6 @@ public class Daemon {
 
             while (serverSocket.isBound()) {
                 Socket socket = serverSocket.accept();
-                socket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
                 Thread.ofPlatform().start(() -> {
                     // Don't block the socket loop.
                     SeatOfPants.handle(socket);
