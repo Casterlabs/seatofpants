@@ -89,15 +89,7 @@ public class SeatOfPants {
                 if (potentialInstance.isPresent()) {
                     Instance instance = potentialInstance.get();
                     LOGGER.info("Using instance for request: %s", instance.id);
-
-                    try {
-                        instance.adopt(socket);
-                    } catch (Exception ignored) {
-                        try {
-                            socket.close();
-                        } catch (IOException ignored2) {}
-                        LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
-                    }
+                    instance.adopt(socket);
                     Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
                     return; // DO NOT execute the below logic.
                 }

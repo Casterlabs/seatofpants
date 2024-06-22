@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.util.Watchdog;
@@ -23,7 +24,7 @@ public abstract class Instance implements Closeable {
     public final @NonNull String id;
     protected final FastLogger logger;
 
-    private volatile int connectionsCount = 0;
+    private AtomicInteger connectionsCount = new AtomicInteger(0);
 
     private volatile boolean hasBeenDestroyed = false;
 
@@ -63,41 +64,48 @@ public abstract class Instance implements Closeable {
      *           Socket will be automatically closed for you.
      */
     public final void adopt(@NonNull Socket clientSocket) {
-        int retryCount = 0;
-        while (clientSocket.isConnected()) {
-            Socket instanceSocket = null;
-            try {
-                instanceSocket = this.connect();
-                this.doProxy(clientSocket, instanceSocket);
-                return;
-            } catch (IOException e) {
+        Thread
+            .ofVirtual()
+            .name(String.format("TCP #%d--%s", clientSocket.hashCode(), this.id))
+            .start(() -> {
                 try {
-                    if (instanceSocket != null) {
-                        instanceSocket.close();
-                    }
-                } catch (IOException ignored) {}
+                    this.connectionsCount.incrementAndGet();
 
-                if (retryCount == SeatOfPants.config.providerMaxRetries) {
-                    try {
-                        clientSocket.close();
-                    } catch (IOException ignored) {} finally {
-                        SeatOfPants.notifyDisconnect();
+                    int retryCount = 0;
+                    while (clientSocket.isConnected()) {
+                        try (Socket instanceSocket = this.connect()) {
+                            instanceSocket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
+                            this.doProxy(clientSocket, instanceSocket);
+                        } catch (IOException e) {
+                            if (retryCount >= SeatOfPants.config.providerMaxRetries) {
+                                try {
+                                    clientSocket.close();
+                                } catch (IOException ignored) {} finally {
+                                    SeatOfPants.notifyDisconnect();
+                                }
+                                this.logger.severe("Timed out whilst adopting:\n%s", e);
+                                return;
+                            }
+
+                            retryCount++;
+
+                            try {
+                                Thread.sleep(100); // Try to give the process enough time to start up.
+                            } catch (InterruptedException e1) {}
+                            continue;
+                        }
                     }
-                    this.logger.severe("Timed out whilst adopting:\n%s", e);
-                    return;
+                } catch (Throwable t) {
+                    this.logger.fatal(t);
+                } finally {
+                    SeatOfPants.LOGGER.info("Closed connection: #%d %s", clientSocket.hashCode(), clientSocket.getRemoteSocketAddress());
+                    this.connectionsCount.decrementAndGet();
+                    SeatOfPants.notifyDisconnect();
                 }
-                retryCount++;
-                try {
-                    Thread.sleep(100); // Try to give the process enough time to start up.
-                } catch (InterruptedException e1) {}
-            }
-        }
+            });
     }
 
-    private final void doProxy(Socket clientSocket, Socket instanceSocket) throws IOException {
-        clientSocket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
-        instanceSocket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
-
+    private final void doProxy(Socket clientSocket, Socket instanceSocket) throws IOException, InterruptedException {
         Thread clientToInstance = Thread
             .ofPlatform()
             .name(String.format("TCP #%d->%s", clientSocket.hashCode(), this.id))
@@ -115,23 +123,14 @@ public abstract class Instance implements Closeable {
                 } catch (IOException ignored) {}
             });
 
-        this.connectionsCount++;
-        Thread
-            .ofVirtual()
-            .name(String.format("TCP #%d--%s", clientSocket.hashCode(), this.id))
-            .start(() -> {
-                try (clientSocket; instanceSocket) {
-                    clientToInstance.join();
-                    instanceToClient.join();
-                } catch (IOException | InterruptedException ignored) {} finally {
-                    this.connectionsCount--;
-                    SeatOfPants.notifyDisconnect();
-                }
-            });
+        try (clientSocket; instanceSocket) {
+            clientToInstance.join();
+            instanceToClient.join();
+        }
     }
 
     public final int connectionsCount() {
-        return this.connectionsCount;
+        return this.connectionsCount.get();
     }
 
     public final long age() {
@@ -160,7 +159,7 @@ public abstract class Instance implements Closeable {
     }
 
     public final boolean hasCapacity() {
-        return this.connectionsCount < SeatOfPants.config.maxConnectionsPerInstance;
+        return this.connectionsCount() < SeatOfPants.config.maxConnectionsPerInstance;
     }
 
 }
