@@ -72,7 +72,7 @@ public abstract class Instance implements Closeable {
                     this.connectionsCount.incrementAndGet();
 
                     int retryCount = 0;
-                    while (clientSocket.isConnected()) {
+                    while (!clientSocket.isClosed()) {
                         try (Socket instanceSocket = this.connect()) {
                             instanceSocket.setSoTimeout(SeatOfPants.SO_TIMEOUT);
                             this.doProxy(clientSocket, instanceSocket);
