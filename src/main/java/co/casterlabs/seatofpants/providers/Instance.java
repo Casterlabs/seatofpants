@@ -64,13 +64,13 @@ public abstract class Instance implements Closeable {
      *           Socket will be automatically closed for you.
      */
     public final void adopt(@NonNull Socket clientSocket) {
+        this.connectionsCount.incrementAndGet();
+
         Thread
-            .ofVirtual()
+            .ofPlatform()
             .name(String.format("TCP #%d--%s", clientSocket.hashCode(), this.id))
             .start(() -> {
                 try {
-                    this.connectionsCount.incrementAndGet();
-
                     int retryCount = 0;
                     while (!clientSocket.isClosed()) {
                         try (Socket instanceSocket = this.connect()) {
