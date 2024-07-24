@@ -167,21 +167,88 @@ public class SeatOfPants {
                     LOGGER.info("Pruned instance: %s", i.id);
                 });
 
-            if (config.instanceWarmRatio > 0) {
-                long requiredFreeConnections = (long) (config.maxConnectionsPerInstance * config.instanceWarmRatio);
+            switch (config.scalingBehavior) {
+                case DYNAMIC_POOL: {
+                    if (config.instanceWarmRatio > 0) {
+                        long requiredFreeConnections = (long) (config.maxConnectionsPerInstance * config.instanceWarmRatio);
 
-                // Count the warm instances.
-                long availableConnectionCount = new ArrayList<>(instances.values())
-                    .stream()
-                    .filter((i) -> i.isAlive())
-                    .filter((i) -> !i.isExpired())
-                    .filter((i) -> !i.isAboutToExpire()) // Don't count instances that are about to expire.
-                    .mapToLong((i) -> Math.max(0, config.maxConnectionsPerInstance - i.connectionsCount())) // max() to avoid a negative value.
-                    .sum();
+                        // Count the warm instances.
+                        long availableConnectionCount = new ArrayList<>(instances.values())
+                            .stream()
+                            .filter((i) -> i.isAlive())
+                            .filter((i) -> !i.isExpired())
+                            .filter((i) -> !i.isAboutToExpire()) // Don't count instances that are about to expire.
+                            .mapToLong((i) -> Math.max(0, config.maxConnectionsPerInstance - i.connectionsCount())) // max() to avoid a negative value.
+                            .sum();
 
-                if (availableConnectionCount < requiredFreeConnections) {
-                    // Spin up more instances.
-                    long amountToCreate = (long) Math.ceil((requiredFreeConnections - availableConnectionCount) / (double) config.maxConnectionsPerInstance);
+                        if (availableConnectionCount < requiredFreeConnections) {
+                            // Spin up more instances.
+                            long amountToCreate = (long) Math.ceil((requiredFreeConnections - availableConnectionCount) / (double) config.maxConnectionsPerInstance);
+
+                            // Parallelize.
+                            List<Thread> waitFor = new LinkedList<>();
+                            for (int i = 0; i < amountToCreate; i++) {
+                                waitFor.add(
+                                    Thread.ofPlatform().start(() -> {
+                                        try {
+                                            createNewInstance();
+                                        } catch (InstanceCreationException e) {
+                                            SeatOfPants.LOGGER.fatal("Unable to create instance! THIS IS BAD!\n%s", e);
+                                        }
+                                    })
+                                );
+                            }
+                            waitFor.forEach((t) -> {
+                                try {
+                                    t.join();
+                                } catch (InterruptedException ignored) {}
+                            });
+                        } else if (availableConnectionCount > requiredFreeConnections) {
+                            // See if we can save money by closing instances with 0 connections.
+                            // We don't want to kill anything that has >0 because we don't know how the app
+                            // handles itself.
+                            List<Instance> canBeDeleted = new ArrayList<>(instances.values())
+                                .parallelStream()
+                                .filter((i) -> i.isAlive())
+                                .filter((i) -> i.connectionsCount() == 0)
+                                .sorted((i1, i2) -> Long.compare(i1.age(), i2.age())) // Prefer older instances.
+                                .collect(Collectors.toList());
+                            long availableConnectionCountCopy = availableConnectionCount;
+
+                            for (Instance instance : canBeDeleted) {
+                                availableConnectionCountCopy -= config.maxConnectionsPerInstance;
+
+                                if (availableConnectionCountCopy < requiredFreeConnections) {
+                                    // Let's not kill our reserve capacity.
+                                    break;
+                                }
+
+                                Thread.ofPlatform().start(() -> {
+                                    try {
+                                        instance.close();
+                                    } catch (Throwable t) {
+                                        SeatOfPants.LOGGER.warn("Error whilst closing instance:\n%s", t);
+                                    } finally {
+                                        instances.remove(instance.id);
+                                    }
+                                    LOGGER.info("Killed unused instance: %s", instance.id);
+                                });
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                case FIXED_POOL: {
+                    long amountAlive = new ArrayList<>(instances.values())
+                        .stream()
+                        .filter((i) -> i.isAlive())
+                        .filter((i) -> !i.isExpired())
+                        .filter((i) -> !i.isAboutToExpire()) // Don't count instances that are about to expire.
+                        .count();
+
+                    long amountToCreate = amountAlive - config.maxInstancesLimit;
+                    if (amountToCreate <= 0) break;
 
                     // Parallelize.
                     List<Thread> waitFor = new LinkedList<>();
@@ -201,37 +268,7 @@ public class SeatOfPants {
                             t.join();
                         } catch (InterruptedException ignored) {}
                     });
-                } else if (availableConnectionCount > requiredFreeConnections) {
-                    // See if we can save money by closing instances with 0 connections.
-                    // We don't want to kill anything that has >0 because we don't know how the app
-                    // handles itself.
-                    List<Instance> canBeDeleted = new ArrayList<>(instances.values())
-                        .parallelStream()
-                        .filter((i) -> i.isAlive())
-                        .filter((i) -> i.connectionsCount() == 0)
-                        .sorted((i1, i2) -> Long.compare(i1.age(), i2.age())) // Prefer older instances.
-                        .collect(Collectors.toList());
-                    long availableConnectionCountCopy = availableConnectionCount;
-
-                    for (Instance instance : canBeDeleted) {
-                        availableConnectionCountCopy -= config.maxConnectionsPerInstance;
-
-                        if (availableConnectionCountCopy < requiredFreeConnections) {
-                            // Let's not kill our reserve capacity.
-                            break;
-                        }
-
-                        Thread.ofPlatform().start(() -> {
-                            try {
-                                instance.close();
-                            } catch (Throwable t) {
-                                SeatOfPants.LOGGER.warn("Error whilst closing instance:\n%s", t);
-                            } finally {
-                                instances.remove(instance.id);
-                            }
-                            LOGGER.info("Killed unused instance: %s", instance.id);
-                        });
-                    }
+                    break;
                 }
             }
 

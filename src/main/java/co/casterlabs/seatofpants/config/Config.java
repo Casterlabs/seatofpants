@@ -33,12 +33,19 @@ public class Config {
     public double instanceWarmRatio = 1;
     public long instanceMaxAgeMinutes = -1; // -1 to disable.
     public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
+    public ScalingBehavior scalingBehavior = ScalingBehavior.DYNAMIC_POOL;
 
     public int apiPort = -1; // -1 to disable.
 
     public static enum InstanceExpireBehavior {
         WAIT_FOR_LAST_CONNECTIONS,
         KILL_INSTANTLY,
+        ;
+    }
+
+    public static enum ScalingBehavior {
+        DYNAMIC_POOL,
+        FIXED_POOL,
         ;
     }
 
