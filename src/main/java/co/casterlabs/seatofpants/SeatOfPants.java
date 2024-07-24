@@ -247,7 +247,7 @@ public class SeatOfPants {
                         .filter((i) -> !i.isAboutToExpire()) // Don't count instances that are about to expire.
                         .count();
 
-                    long amountToCreate = amountAlive - config.maxInstancesLimit;
+                    long amountToCreate = config.maxInstancesLimit - amountAlive;
                     if (amountToCreate <= 0) break;
 
                     // Parallelize.
