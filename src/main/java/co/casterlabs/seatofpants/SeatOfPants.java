@@ -90,7 +90,7 @@ public class SeatOfPants {
                     Instance instance = potentialInstance.get();
                     LOGGER.info("Using instance for request: %s", instance.id);
                     instance.adopt(socket);
-                    Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
+//                    Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
                     return; // DO NOT execute the below logic.
                 }
             }
