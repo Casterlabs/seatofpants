@@ -3,6 +3,10 @@ package co.casterlabs.seatofpants.providers;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,6 +29,7 @@ public abstract class Instance implements Closeable {
     protected final FastLogger logger;
 
     private AtomicInteger connectionsCount = new AtomicInteger(0);
+    private Set<Socket> connections = Collections.synchronizedSet(new HashSet<>());
 
     private volatile boolean hasBeenDestroyed = false;
 
@@ -56,6 +61,19 @@ public abstract class Instance implements Closeable {
     public final void close() {
         if (this.hasBeenDestroyed) return;
         this.hasBeenDestroyed = true;
+
+        if (SeatOfPants.config.instanceConnectionRateSeconds > 0) {
+            logger.info("Starting slow/graceful disconnect for %d clients.", this.connections.size());
+            for (Socket s : new ArrayList<>(this.connections)) {
+                try {
+                    s.close();
+                } catch (IOException ignored) {}
+                try {
+                    TimeUnit.SECONDS.sleep(SeatOfPants.config.instanceConnectionRateSeconds);
+                } catch (InterruptedException ignored) {}
+            }
+        }
+
         this.close0();
     }
 
@@ -63,8 +81,9 @@ public abstract class Instance implements Closeable {
      * @implNote This method blocks until the connection is terminated. The provided
      *           Socket will be automatically closed for you.
      */
-    public final void adopt(@NonNull Socket clientSocket) {
+    public synchronized final void adopt(@NonNull Socket clientSocket) {
         this.connectionsCount.incrementAndGet();
+        this.connections.add(clientSocket);
 
         Thread
             .ofPlatform()
@@ -102,9 +121,17 @@ public abstract class Instance implements Closeable {
                 } finally {
                     SeatOfPants.LOGGER.info("Closed connection: #%d %s", clientSocket.hashCode(), clientSocket.getRemoteSocketAddress());
                     this.connectionsCount.decrementAndGet();
+                    this.connections.remove(clientSocket);
                     SeatOfPants.notifyDisconnect();
                 }
             });
+
+        if (SeatOfPants.config.instanceConnectionRateSeconds > 0) {
+            // Limit subsequent connections (via the synchronized keyword)
+            try {
+                TimeUnit.SECONDS.sleep(SeatOfPants.config.instanceConnectionRateSeconds);
+            } catch (InterruptedException ignored) {}
+        }
     }
 
     private final void doProxy(Socket clientSocket, Socket instanceSocket) throws IOException {
