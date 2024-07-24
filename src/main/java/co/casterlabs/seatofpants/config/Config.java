@@ -35,6 +35,7 @@ public class Config {
     public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
     public ScalingBehavior scalingBehavior = ScalingBehavior.DYNAMIC_POOL;
     public long instanceConnectionRateSeconds = -1; // -1 to disable.
+    public long instanceDisconnectionRateSeconds = -1; // -1 to disable.
 
     public int apiPort = -1; // -1 to disable.
 
