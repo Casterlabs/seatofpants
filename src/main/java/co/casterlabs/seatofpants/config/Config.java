@@ -32,6 +32,7 @@ public class Config {
     public int maxConnectionsPerInstance = 1;
     public double instanceWarmRatio = 1;
     public long instanceMaxAgeMinutes = -1; // -1 to disable.
+    public long instanceAboutToExpireMinutes = 3;
     public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
     public ScalingBehavior scalingBehavior = ScalingBehavior.DYNAMIC_POOL;
     public long instanceConnectionRateSeconds = -1; // -1 to disable.

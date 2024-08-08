@@ -175,15 +175,13 @@ public abstract class Instance implements Closeable {
     }
 
     public final boolean isAboutToExpire() {
-        final int aboutToMinutes = 3;
-
         if (SeatOfPants.config.instanceMaxAgeMinutes == -1) return false;
-        if (SeatOfPants.config.instanceMaxAgeMinutes <= aboutToMinutes) return false; // Our "about to" logic won't work. So we won't do it.
+        if (SeatOfPants.config.instanceMaxAgeMinutes <= SeatOfPants.config.instanceAboutToExpireMinutes) return false; // Our "about to" logic won't work. So we won't do it.
 
-        long maxAgeMs = TimeUnit.MINUTES.toMillis(SeatOfPants.config.instanceMaxAgeMinutes - aboutToMinutes);
+        long aboutToExpireAgeMs = TimeUnit.MINUTES.toMillis(SeatOfPants.config.instanceMaxAgeMinutes - SeatOfPants.config.instanceAboutToExpireMinutes);
         long myAge = this.age();
 
-        return myAge >= maxAgeMs;
+        return myAge >= aboutToExpireAgeMs;
     }
 
     public final boolean hasCapacity() {
