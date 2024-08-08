@@ -286,9 +286,19 @@ public class SeatOfPants {
                         switch (config.expirationBehavior) {
                             case WAIT_FOR_LAST_CONNECTIONS:
                                 if (instance.connectionsCount() > 0) {
+                                    if (config.killAfterWaitingForLastMinutes > 0) {
+                                        // We need to determine if the instance should be forcibly killed.
+                                        long killAfterAge = TimeUnit.MINUTES.toMillis(config.instanceMaxAgeMinutes + config.killAfterWaitingForLastMinutes);
+
+                                        if (instance.age() >= killAfterAge) {
+                                            break; // Yup, needs to be killed.
+                                        }
+                                    }
+
                                     return; // Continue to let it live.
                                 }
-                                break; // Kill code below.
+
+                                break; // No connections, trigger the kill code below.
 
                             case KILL_INSTANTLY:
                                 break; // Kill code below.

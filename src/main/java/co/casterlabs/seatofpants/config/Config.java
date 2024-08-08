@@ -36,6 +36,7 @@ public class Config {
     public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
     public long instanceMaxAgeMinutes = -1; // -1 to disable.
     public long instanceAboutToExpireMinutes = 3;
+    public long killAfterWaitingForLastMinutes = -1; // -1 to disable.
 
     public long instanceConnectionRateSeconds = -1; // -1 to disable.
     public long instanceDisconnectionRateSeconds = -1; // -1 to disable.
