@@ -39,15 +39,18 @@ public class SeatOfPants {
     private static final Object tickLock = new Object();
     private static final Object notifications = new Object();
 
+    private static boolean isShuttingDown = false;
+
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            isShuttingDown = true;
+
             for (Instance instance : new ArrayList<>(instances.values())) {
                 try {
                     instance.close();
                 } catch (Throwable ignored) {}
             }
-        }));
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+
             for (Runnable toRun : new ArrayList<>(runOnClose)) {
                 try {
                     toRun.run();
@@ -58,7 +61,7 @@ public class SeatOfPants {
             .ofVirtual()
             .name("Background tick() thread.")
             .start(() -> {
-                while (true) {
+                while (!isShuttingDown) {
                     try {
                         TimeUnit.SECONDS.sleep(15);
                     } catch (InterruptedException ignored) {}
@@ -157,6 +160,8 @@ public class SeatOfPants {
     }
 
     public static void tick() {
+        if (isShuttingDown) return;
+
         synchronized (tickLock) {
             // Prune any dead instances.
             new ArrayList<>(instances.values())
