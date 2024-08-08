@@ -60,9 +60,11 @@ public abstract class Instance implements Closeable {
     @Override
     public final void close() {
         if (this.hasBeenDestroyed) return;
+
+        boolean wasConsideredToBeAlive = this.isAlive();
         this.hasBeenDestroyed = true;
 
-        if (this.isAlive() && SeatOfPants.config.instanceDisconnectionRateSeconds > 0) {
+        if (wasConsideredToBeAlive && SeatOfPants.config.instanceDisconnectionRateSeconds > 0) {
             // We don't want to do this if we've determined the instance to be unhealthy or
             // otherwise dead.
             logger.info("Starting slow/graceful disconnect for %d clients.", this.connections.size());
