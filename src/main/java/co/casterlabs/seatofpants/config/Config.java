@@ -17,6 +17,7 @@ public class Config {
 
     public boolean debug = false;
     public int port = 10246;
+    public int apiPort = -1; // -1 to disable.
 
     public @Nullable String heartbeatUrl = null;
     public long heartbeatIntervalSeconds = 15;
@@ -25,20 +26,19 @@ public class Config {
     public JsonObject providerConfig;
     public int providerMaxRetries = 500;
     public long providerRetryTimeout = 100;
-
     public long providerMaxCreationTime = 120 * 1000;
 
+    public ScalingBehavior scalingBehavior = ScalingBehavior.DYNAMIC_POOL;
     public int maxInstancesLimit = -1;
     public int maxConnectionsPerInstance = 1;
     public double instanceWarmRatio = 1;
+
+    public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
     public long instanceMaxAgeMinutes = -1; // -1 to disable.
     public long instanceAboutToExpireMinutes = 3;
-    public InstanceExpireBehavior expirationBehavior = InstanceExpireBehavior.WAIT_FOR_LAST_CONNECTIONS;
-    public ScalingBehavior scalingBehavior = ScalingBehavior.DYNAMIC_POOL;
+
     public long instanceConnectionRateSeconds = -1; // -1 to disable.
     public long instanceDisconnectionRateSeconds = -1; // -1 to disable.
-
-    public int apiPort = -1; // -1 to disable.
 
     public static enum InstanceExpireBehavior {
         WAIT_FOR_LAST_CONNECTIONS,
