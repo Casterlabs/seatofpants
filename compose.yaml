@@ -1,0 +1,12 @@
+services:
+  seatofpants:
+    image: ghcr.io/casterlabs/seatofpants:latest
+    restart: always
+    volumes:
+      - data:/home/container/data
+      # - /var/run/docker.sock:/var/run/docker.sock # Only needed if you use the Docker provider
+    ports:
+      - 9000:10246 # Change 9000 to your liking.
+
+volumes:
+  data:
