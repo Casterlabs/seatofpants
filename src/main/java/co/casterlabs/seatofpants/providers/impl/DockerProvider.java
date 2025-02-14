@@ -55,7 +55,7 @@ public class DockerProvider implements InstanceProvider {
                 .add("docker", "run")
                 .add("--rm")
                 .add("--name", idToUse)
-                .add("-p", String.format("%d:%d", port, this.config.portToMap));
+                .add("-p", String.format("127.0.0.1:%d:%d", port, this.config.portToMap));
             for (Map.Entry<String, String> entry : this.config.env.entrySet()) {
                 command.add(
                     "-e",
