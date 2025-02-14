@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import co.casterlabs.seatofpants.config.Config;
@@ -35,8 +36,8 @@ public class SeatOfPants {
     private static Map<String, Instance> instances = new HashMap<>();
     public static final Set<Runnable> runOnClose = Collections.synchronizedSet(new HashSet<>());
 
-    private static final Object searchLock = new Object();
-    private static final Object tickLock = new Object();
+    private static final ReentrantLock searchLock = new ReentrantLock();
+    private static final ReentrantLock tickLock = new ReentrantLock();
     private static final Object notifications = new Object();
 
     private static boolean isShuttingDown = false;
@@ -58,7 +59,7 @@ public class SeatOfPants {
             }
         }));
         Thread
-            .ofVirtual()
+            .ofPlatform()
             .name("Background tick() thread.")
             .start(() -> {
                 while (!isShuttingDown) {
@@ -74,12 +75,12 @@ public class SeatOfPants {
         try {
             LOGGER.info("Incoming connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
 
-            Optional<Instance> potentialInstance;
-            synchronized (searchLock) {
+            searchLock.lock();
+            try {
                 LOGGER.info("Processing connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
 
                 // Look for an existing instance that has capacity.
-                potentialInstance = new ArrayList<>(instances.values())
+                Optional<Instance> potentialInstance = new ArrayList<>(instances.values())
                     .parallelStream()
                     .filter((i) -> !i.isExpired())
                     .filter((i) -> !i.isAboutToExpire())
@@ -94,8 +95,17 @@ public class SeatOfPants {
                     LOGGER.info("Using instance for request: %s", instance.id);
                     instance.adopt(socket);
 //                    Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
+
+                    if (SeatOfPants.config.instanceConnectionRateMilliseconds > 0) {
+                        try {
+                            // Limit subsequent connections (via the lock)
+                            TimeUnit.MILLISECONDS.sleep(SeatOfPants.config.instanceConnectionRateMilliseconds);
+                        } catch (InterruptedException ignored) {}
+                    }
                     return; // DO NOT execute the below logic.
                 }
+            } finally {
+                searchLock.unlock();
             }
 
             // There was no instance ready...
@@ -110,13 +120,13 @@ public class SeatOfPants {
 
             // Recurse.
             handle(socket);
-            return;
-        } catch (InterruptedException e) {
+        } catch (Throwable t) {
             LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
+            Thread.interrupted(); // Clear.
             try {
                 socket.close(); // Make sure to close the socket since we failed.
             } catch (IOException ignored) {}
-            SeatOfPants.LOGGER.fatal("Unable to create instance! THIS IS BAD!\n%s", e);
+            SeatOfPants.LOGGER.fatal("Unable to process connection! THIS IS BAD!\n%s", t);
         }
     }
 
@@ -162,7 +172,8 @@ public class SeatOfPants {
     public static void tick() {
         if (isShuttingDown) return;
 
-        synchronized (tickLock) {
+        tickLock.lock();
+        try {
             // Prune any dead instances.
             new ArrayList<>(instances.values())
                 .parallelStream()
@@ -318,6 +329,8 @@ public class SeatOfPants {
                         });
                     });
             }
+        } finally {
+            tickLock.unlock();
         }
     }
 

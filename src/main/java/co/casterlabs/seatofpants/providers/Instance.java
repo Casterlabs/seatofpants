@@ -64,7 +64,7 @@ public abstract class Instance implements Closeable {
         boolean wasConsideredToBeAlive = this.isAlive();
         this.hasBeenDestroyed = true;
 
-        if (wasConsideredToBeAlive && SeatOfPants.config.instanceDisconnectionRateSeconds > 0) {
+        if (wasConsideredToBeAlive && SeatOfPants.config.instanceConnectionRateMilliseconds > 0) {
             // We don't want to do this if we've determined the instance to be unhealthy or
             // otherwise dead.
             logger.info("Starting slow/graceful disconnect for %d clients.", this.connections.size());
@@ -73,7 +73,7 @@ public abstract class Instance implements Closeable {
                     s.close();
                 } catch (IOException ignored) {}
                 try {
-                    TimeUnit.SECONDS.sleep(SeatOfPants.config.instanceDisconnectionRateSeconds);
+                    TimeUnit.MILLISECONDS.sleep(SeatOfPants.config.instanceConnectionRateMilliseconds);
                 } catch (InterruptedException ignored) {}
             }
         } else {
@@ -136,13 +136,6 @@ public abstract class Instance implements Closeable {
                     SeatOfPants.notifyDisconnect();
                 }
             });
-
-        if (SeatOfPants.config.instanceConnectionRateSeconds > 0) {
-            // Limit subsequent connections (via the synchronized keyword)
-            try {
-                TimeUnit.SECONDS.sleep(SeatOfPants.config.instanceConnectionRateSeconds);
-            } catch (InterruptedException ignored) {}
-        }
     }
 
     private final void doProxy(Socket clientSocket, Socket instanceSocket) throws IOException {

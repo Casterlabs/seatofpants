@@ -5,7 +5,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import co.casterlabs.rakurai.json.annotating.JsonClass;
+import co.casterlabs.rakurai.json.annotating.JsonDeserializationMethod;
 import co.casterlabs.rakurai.json.annotating.JsonField;
+import co.casterlabs.rakurai.json.element.JsonElement;
 import co.casterlabs.rakurai.json.element.JsonObject;
 import co.casterlabs.seatofpants.providers.InstanceProvider;
 import lombok.ToString;
@@ -38,8 +40,18 @@ public class Config {
     public long instanceAboutToExpireMinutes = 3;
     public long killAfterWaitingForLastMinutes = -1; // -1 to disable.
 
-    public long instanceConnectionRateSeconds = -1; // -1 to disable.
-    public long instanceDisconnectionRateSeconds = -1; // -1 to disable.
+    public long instanceConnectionRateMilliseconds = -1; // -1 to disable.
+    public long instanceDisconnectionRateMilliseconds = -1; // -1 to disable.
+
+    @JsonDeserializationMethod("instanceConnectionRateSeconds")
+    private void $deserialize_instanceConnectionRateSeconds(JsonElement e) {
+        this.instanceConnectionRateMilliseconds = e.getAsNumber().longValue() * 1000;
+    }
+
+    @JsonDeserializationMethod("instanceDisconnectionRateSeconds")
+    private void $deserialize_instanceDisconnectionRateSeconds(JsonElement e) {
+        this.instanceDisconnectionRateMilliseconds = e.getAsNumber().longValue() * 1000;
+    }
 
     public static enum InstanceExpireBehavior {
         WAIT_FOR_LAST_CONNECTIONS,
