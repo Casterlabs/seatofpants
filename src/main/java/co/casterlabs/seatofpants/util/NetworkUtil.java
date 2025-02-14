@@ -8,7 +8,7 @@ public class NetworkUtil {
 
     public static int randomPort() throws IOException {
         try (ServerSocket serverSocket = new ServerSocket()) {
-            serverSocket.setReuseAddress(false);
+            serverSocket.setReuseAddress(true);
             serverSocket.bind(new InetSocketAddress("127.0.0.1", 0), 1);
             return serverSocket.getLocalPort();
         }
