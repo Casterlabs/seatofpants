@@ -33,5 +33,5 @@ jobs:
           username: ${{github.actor}}
           password: ${{secrets.GITHUB_TOKEN}}
 
-      - name: Build & Push image # TODO Add-back linux/s390x, need a fallback for ShenandoahGC
-        run: docker buildx build --platform=linux/amd64,linux/arm64/v8,linux/ppc64le --tag ghcr.io/casterlabs/seatofpants:latest --push .
+      - name: Build & Push image
+        run: docker buildx build --platform=linux/amd64,linux/arm64/v8 --tag ghcr.io/casterlabs/seatofpants:latest --push .
