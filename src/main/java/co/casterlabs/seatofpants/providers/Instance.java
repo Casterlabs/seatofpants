@@ -50,6 +50,8 @@ public abstract class Instance implements Closeable {
             } catch (Exception e) {
                 this.logger.trace(e);
                 // Assume the last state.
+            } finally {
+                Thread.interrupted(); // Clear.
             }
             this.lastAliveCheck = System.currentTimeMillis();
         }

@@ -116,6 +116,8 @@ public class SeatOfPants {
                 synchronized (notifications) {
                     notifications.wait();
                 }
+            } finally {
+                Thread.interrupted(); // Clear.
             }
 
             // Recurse.
@@ -163,6 +165,7 @@ public class SeatOfPants {
             instances.put(id, instance);
             LOGGER.info("Created instance: %s", id);
         } finally {
+            Thread.interrupted(); // Clear.
             synchronized (notifications) {
                 notifications.notifyAll();
             }
