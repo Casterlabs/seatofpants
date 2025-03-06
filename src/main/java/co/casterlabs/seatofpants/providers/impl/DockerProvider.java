@@ -32,7 +32,7 @@ public class DockerProvider implements InstanceProvider {
         private int portToMap = 8080;
         private Map<String, String> env = Collections.emptyMap();
         private double cpuLimit = -1; // -1 = no limit, 1 = 1 core, 1.5 = 1.5 cores, etc
-        private int memoryLimitMb = -1; // -1 = no limit
+        private int memoryLimitGb = -1; // -1 = no limit
         private int swapLimitMb = 0; // -1 = no limit, 0 = same as memory limit
 
     }
@@ -75,8 +75,8 @@ public class DockerProvider implements InstanceProvider {
                 command.add("--cpus", String.valueOf(this.config.cpuLimit));
             }
 
-            if (this.config.memoryLimitMb > 0) {
-                command.add("--memory", String.valueOf(this.config.memoryLimitMb) + "m");
+            if (this.config.memoryLimitGb > 0) {
+                command.add("--memory", String.valueOf(this.config.memoryLimitGb) + "g");
             }
 
             if (this.config.swapLimitMb == -1) {
