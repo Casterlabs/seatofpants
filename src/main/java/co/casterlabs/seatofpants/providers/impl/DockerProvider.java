@@ -120,19 +120,14 @@ public class DockerProvider implements InstanceProvider {
                 .start()
                 .waitFor(); // Wait for it to start.
 
-            String networkAddress;
-            {
-                String n = null;
-                while (n == null || n.isBlank()) {
-                    n = inspect(idToUse, logger)
-                        .getObject("NetworkSettings")
-                        .getString("IPAddress");
-                    Thread.sleep(1000);
-                }
-                networkAddress = n;
-            }
+            JsonObject networkSettings = inspect(idToUse, logger)
+                .getObject("NetworkSettings");
 
-            logger.debug("Created instance! Network address: %s:d", networkAddress, port);
+            String networkAddress = this.config.networkToUse == null ? //
+                networkSettings.getString("IPAddress") : //
+                networkSettings.getObject("Networks").getObject(this.config.networkToUse).getString("IPAddress");
+
+            logger.debug("Created instance! Network address: %s:%d", networkAddress, port);
 
             return new Instance(idToUse, logger) {
                 @Override
@@ -172,7 +167,9 @@ public class DockerProvider implements InstanceProvider {
                         .waitFor();
                 }
             };
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException |
+
+            InterruptedException e) {
             throw new InstanceCreationException(e);
         }
     }
