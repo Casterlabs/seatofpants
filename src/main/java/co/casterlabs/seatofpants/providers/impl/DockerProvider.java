@@ -120,9 +120,17 @@ public class DockerProvider implements InstanceProvider {
                 .start()
                 .waitFor(); // Wait for it to start.
 
-            String networkAddress = inspect(idToUse, logger)
-                .getObject("NetworkSettings")
-                .getString("IPAddress");
+            String networkAddress;
+            {
+                String n = null;
+                while (n == null || n.isBlank()) {
+                    n = inspect(idToUse, logger)
+                        .getObject("NetworkSettings")
+                        .getString("IPAddress");
+                    Thread.sleep(1000);
+                }
+                networkAddress = n;
+            }
 
             logger.debug("Created instance! Network address: %s:d", networkAddress, port);
 
