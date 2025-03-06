@@ -33,6 +33,10 @@ public class DockerProvider implements InstanceProvider {
         private int memoryLimitGb = -1; // -1 = no limit
         private int swapLimitMb = 0; // -1 = no limit, 0 = same as memory limit
 
+        private String authRegistry = null; // Null to disable.
+        private String authUsername = null; // Null to disable.
+        private String authPassword = null; // Null to disable.
+
     }
 
     @Override
@@ -44,6 +48,20 @@ public class DockerProvider implements InstanceProvider {
     @Override
     public void loadConfig(JsonObject providerConfig) {
         this.config = Rson.DEFAULT.fromJson(providerConfig, Config.class);
+
+        if (this.config.authRegistry != null && this.config.authUsername != null && this.config.authPassword != null) {
+            CommandBuilder command = new CommandBuilder()
+                .add("docker", "login")
+                .add(this.config.authRegistry)
+                .add("--username", this.config.authUsername)
+                .add("--password", this.config.authPassword);
+            new ProcessBuilder(command.asList())
+                .redirectError(Redirect.INHERIT)
+                .redirectOutput(Redirect.INHERIT)
+                .redirectInput(Redirect.DISCARD)
+                .start()
+                .waitFor();
+        }
     }
 
     @Override
