@@ -73,6 +73,7 @@ public class DockerProvider implements InstanceProvider {
             CommandBuilder command = new CommandBuilder()
                 .add("docker", "run")
                 .add("--rm")
+                .add("--pull", "always")
                 .add("--name", idToUse)
                 .add("-p", String.format("127.0.0.1:%d:%d", port, this.config.portToMap));
             for (Map.Entry<String, String> entry : this.config.env.entrySet()) {
