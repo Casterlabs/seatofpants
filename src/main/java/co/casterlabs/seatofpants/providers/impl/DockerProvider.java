@@ -145,7 +145,7 @@ public class DockerProvider implements InstanceProvider {
                     this.logger.trace("Closed.");
                     new ProcessBuilder(
                         "docker",
-                        "kill",
+                        "stop",
                         idToUse
                     )
                         .redirectError(Redirect.PIPE)
