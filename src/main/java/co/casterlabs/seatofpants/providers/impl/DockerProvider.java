@@ -3,10 +3,13 @@ package co.casterlabs.seatofpants.providers.impl;
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import co.casterlabs.commons.io.streams.StreamUtil;
 import co.casterlabs.rakurai.json.Rson;
 import co.casterlabs.rakurai.json.annotating.JsonClass;
+import co.casterlabs.rakurai.json.element.JsonArray;
 import co.casterlabs.rakurai.json.element.JsonObject;
 import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.providers.Instance;
@@ -14,7 +17,6 @@ import co.casterlabs.seatofpants.providers.InstanceCreationException;
 import co.casterlabs.seatofpants.providers.InstanceProvider;
 import co.casterlabs.seatofpants.util.CommandBuilder;
 import co.casterlabs.seatofpants.util.Environment;
-import co.casterlabs.seatofpants.util.NetworkUtil;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
@@ -28,7 +30,9 @@ public class DockerProvider implements InstanceProvider {
     private static class Config {
         public String imageToUse = "hashicorp/http-echo";
         public Environment env = new Environment();
-        public int portToMap = 5678;
+        public int port = 5678;
+
+        public String networkToUse = null; // null = default
 
         public double cpuLimit = -1; // -1 = no limit, 1 = 1 core, 1.5 = 1.5 cores, etc
         public int memoryLimitGb = -1; // -1 = no limit
@@ -68,15 +72,16 @@ public class DockerProvider implements InstanceProvider {
     @Override
     public Instance create(@NonNull String idToUse) throws InstanceCreationException {
         try {
-            int port = NetworkUtil.randomPort();
             FastLogger logger = LOGGER.createChild("Instance " + idToUse);
+            int port = this.config.port;
 
             CommandBuilder command = new CommandBuilder()
                 .add("docker", "run")
                 .add("--rm")
+                .add("--detach")
                 .add("--pull", "always")
-                .add("--name", idToUse)
-                .add("-p", String.format("127.0.0.1:%d:%d", port, this.config.portToMap));
+                .add("--name", idToUse);
+
             for (Map.Entry<String, String> entry : this.config.env.get().entrySet()) {
                 command.add(
                     "-e",
@@ -84,9 +89,12 @@ public class DockerProvider implements InstanceProvider {
                         "%s=%s",
                         entry.getKey(),
                         entry.getValue()
-                            .replace("%port%", String.valueOf(port))
                     )
                 );
+            }
+
+            if (this.config.networkToUse != null) {
+                command.add("--network", this.config.networkToUse);
             }
 
             if (this.config.cpuLimit > 0) {
@@ -105,38 +113,37 @@ public class DockerProvider implements InstanceProvider {
 
             command.add(this.config.imageToUse);
 
-            Process proc = new ProcessBuilder(command.asList())
+            new ProcessBuilder(command.asList())
                 .redirectError(Redirect.DISCARD)
                 .redirectOutput(Redirect.DISCARD)
                 .redirectInput(Redirect.PIPE)
-                .start();
+                .start()
+                .waitFor(); // Wait for it to start.
 
-            Thread
-                .ofVirtual()
-                .name("Docker process close handler")
-                .start(() -> {
-                    try {
-                        proc.waitFor();
-                    } catch (InterruptedException ignored) {
-                        Thread.interrupted(); // Clear
-                    }
-                    SeatOfPants.tick();
-                });
+            String networkAddress = inspect(idToUse, logger)
+                .getObject("NetworkSettings")
+                .getString("IPAddress");
 
             return new Instance(idToUse, logger) {
                 @Override
                 protected Socket connect() throws IOException {
-                    return new Socket("127.0.0.1", port);
+                    return new Socket(networkAddress, port);
                 }
 
                 @Override
                 public String getAddress() {
-                    return String.format("127.0.0.1:%d", port);
+                    return String.format("%s:%d", networkAddress, port);
                 }
 
                 @Override
                 protected boolean isAlive0() {
-                    return proc.isAlive();
+                    try {
+                        return inspect(idToUse, this.logger)
+                            .getObject("State")
+                            .getBoolean("Running");
+                    } catch (IOException e) {
+                        return false;
+                    }
                 }
 
                 @SneakyThrows
@@ -155,9 +162,24 @@ public class DockerProvider implements InstanceProvider {
                         .waitFor();
                 }
             };
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             throw new InstanceCreationException(e);
         }
+    }
+
+    private static JsonObject inspect(String id, FastLogger logger) throws IOException {
+        Process inspectProc = new ProcessBuilder("docker", "inspect", id)
+            .redirectError(Redirect.DISCARD)
+            .redirectOutput(Redirect.PIPE)
+            .redirectInput(Redirect.PIPE)
+            .start();
+
+        String inspectStr = StreamUtil.toString(inspectProc.getInputStream(), StandardCharsets.UTF_8);
+        logger.debug(inspectStr);
+
+        JsonArray inspect = Rson.DEFAULT.fromJson(inspectStr, JsonArray.class);
+
+        return inspect.getObject(0);
     }
 
 }
