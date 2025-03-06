@@ -7,8 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Collections;
-import java.util.Map;
 import java.util.function.Supplier;
 
 import com.oracle.bmc.ConfigFileReader;
@@ -41,6 +39,7 @@ import co.casterlabs.seatofpants.SeatOfPants;
 import co.casterlabs.seatofpants.providers.Instance;
 import co.casterlabs.seatofpants.providers.InstanceCreationException;
 import co.casterlabs.seatofpants.providers.InstanceProvider;
+import co.casterlabs.seatofpants.util.Environment;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
@@ -72,7 +71,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
 
         // Image
         public String imageUrl = "docker.io/crccheck/hello-world:latest";
-        public Map<String, String> env = Collections.emptyMap();
+        public Environment env = new Environment();
         public long gracefulShutdownTimeoutSeconds = 30; // Seconds, max 300
 
         public String registryAuthEndpoint; // Usually docker.io or something like iad.ocir.io.
@@ -153,7 +152,7 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                             CreateContainerDetails.builder()
                                 .displayName("container." + idToUse)
                                 .imageUrl(this.config.imageUrl)
-                                .environmentVariables(this.config.env)
+                                .environmentVariables(this.config.env.get())
 //                                .volumeMounts(
 //                                    new ArrayList<>(
 //                                        Arrays.asList(

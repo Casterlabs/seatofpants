@@ -3,7 +3,6 @@ package co.casterlabs.seatofpants.providers.impl;
 import java.io.IOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.Socket;
-import java.util.Collections;
 import java.util.Map;
 
 import co.casterlabs.rakurai.json.Rson;
@@ -14,6 +13,7 @@ import co.casterlabs.seatofpants.providers.Instance;
 import co.casterlabs.seatofpants.providers.InstanceCreationException;
 import co.casterlabs.seatofpants.providers.InstanceProvider;
 import co.casterlabs.seatofpants.util.CommandBuilder;
+import co.casterlabs.seatofpants.util.Environment;
 import co.casterlabs.seatofpants.util.NetworkUtil;
 import lombok.NonNull;
 import lombok.SneakyThrows;
@@ -26,12 +26,13 @@ public class DockerProvider implements InstanceProvider {
 
     @JsonClass(exposeAll = true)
     private static class Config {
-        private String imageToUse = "hashicorp/http-echo";
-        private int portToMap = 5678;
-        private Map<String, String> env = Collections.emptyMap();
-        private double cpuLimit = -1; // -1 = no limit, 1 = 1 core, 1.5 = 1.5 cores, etc
-        private int memoryLimitGb = -1; // -1 = no limit
-        private int swapLimitMb = 0; // -1 = no limit, 0 = same as memory limit
+        public String imageToUse = "hashicorp/http-echo";
+        public Environment env = new Environment();
+        public int portToMap = 5678;
+
+        public double cpuLimit = -1; // -1 = no limit, 1 = 1 core, 1.5 = 1.5 cores, etc
+        public int memoryLimitGb = -1; // -1 = no limit
+        public int swapLimitMb = 0; // -1 = no limit, 0 = same as memory limit
 
         private String authRegistry = null; // Null to disable.
         private String authUsername = null; // Null to disable.
@@ -76,7 +77,7 @@ public class DockerProvider implements InstanceProvider {
                 .add("--pull", "always")
                 .add("--name", idToUse)
                 .add("-p", String.format("127.0.0.1:%d:%d", port, this.config.portToMap));
-            for (Map.Entry<String, String> entry : this.config.env.entrySet()) {
+            for (Map.Entry<String, String> entry : this.config.env.get().entrySet()) {
                 command.add(
                     "-e",
                     String.format(

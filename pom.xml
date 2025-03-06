@@ -145,7 +145,7 @@
 			<scope>compile</scope>
 		</dependency>
 
-		<!-- Webhooks -->
+		<!-- API -->
 		<dependency>
 			<groupId>co.casterlabs</groupId>
 			<artifactId>Rakurai-Http-Server</artifactId>
@@ -158,6 +158,12 @@
 			<groupId>co.casterlabs</groupId>
 			<artifactId>Rson</artifactId>
 			<version>1.17.9</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>co.casterlabs.commons</groupId>
+			<artifactId>Functional</artifactId>
+			<version>1.9.0</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
