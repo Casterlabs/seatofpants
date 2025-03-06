@@ -1,8 +1,6 @@
 package co.casterlabs.seatofpants.providers.impl;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.Socket;
 import java.util.Collections;
@@ -28,8 +26,8 @@ public class DockerProvider implements InstanceProvider {
 
     @JsonClass(exposeAll = true)
     private static class Config {
-        private String imageToUse = "pottava/http-re:1.3";
-        private int portToMap = 8080;
+        private String imageToUse = "hashicorp/http-echo";
+        private int portToMap = 5678;
         private Map<String, String> env = Collections.emptyMap();
         private double cpuLimit = -1; // -1 = no limit, 1 = 1 core, 1.5 = 1.5 cores, etc
         private int memoryLimitGb = -1; // -1 = no limit
@@ -88,33 +86,10 @@ public class DockerProvider implements InstanceProvider {
             command.add(this.config.imageToUse);
 
             Process proc = new ProcessBuilder(command.asList())
-                .redirectError(Redirect.PIPE)
-                .redirectOutput(Redirect.PIPE)
-                .redirectInput(Redirect.PIPE)
+                .redirectError(Redirect.DISCARD)
+                .redirectOutput(Redirect.DISCARD)
+                .redirectInput(Redirect.DISCARD)
                 .start();
-
-            Thread
-                .ofVirtual()
-                .name("A log thread")
-                .start(() -> {
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            logger.trace(line);
-                        }
-                    } catch (IOException ignored) {}
-                });
-            Thread
-                .ofVirtual()
-                .name("A log thread")
-                .start(() -> {
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getErrorStream()))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            logger.trace(line);
-                        }
-                    } catch (IOException ignored) {}
-                });
 
             Thread
                 .ofVirtual()
