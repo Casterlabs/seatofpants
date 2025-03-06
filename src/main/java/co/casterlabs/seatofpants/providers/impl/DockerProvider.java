@@ -31,6 +31,9 @@ public class DockerProvider implements InstanceProvider {
         private String imageToUse = "pottava/http-re:1.3";
         private int portToMap = 8080;
         private Map<String, String> env = Collections.emptyMap();
+        private double cpuLimit = -1; // -1 = no limit, 1 = 1 core, 1.5 = 1.5 cores, etc
+        private int memoryLimitMb = -1; // -1 = no limit
+        private int swapLimitMb = 0; // -1 = no limit, 0 = same as memory limit
 
     }
 
@@ -67,6 +70,21 @@ public class DockerProvider implements InstanceProvider {
                     )
                 );
             }
+
+            if (this.config.cpuLimit > 0) {
+                command.add("--cpus", String.valueOf(this.config.cpuLimit));
+            }
+
+            if (this.config.memoryLimitMb > 0) {
+                command.add("--memory", String.valueOf(this.config.memoryLimitMb) + "m");
+            }
+
+            if (this.config.swapLimitMb == -1) {
+                command.add("--memory-swap", "-1");
+            } else if (this.config.swapLimitMb > 0) {
+                command.add("--memory-swap", String.valueOf(this.config.swapLimitMb) + "m");
+            }
+
             command.add(this.config.imageToUse);
 
             Process proc = new ProcessBuilder(command.asList())
@@ -100,11 +118,13 @@ public class DockerProvider implements InstanceProvider {
 
             Thread
                 .ofVirtual()
-                .name("A watchdog thread")
+                .name("Docker process close handler")
                 .start(() -> {
                     try {
                         proc.waitFor();
-                    } catch (InterruptedException ignored) {}
+                    } catch (InterruptedException ignored) {
+                        Thread.interrupted(); // Clear
+                    }
                     SeatOfPants.tick();
                 });
 
