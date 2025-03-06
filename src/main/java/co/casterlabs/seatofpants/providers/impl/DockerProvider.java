@@ -124,6 +124,8 @@ public class DockerProvider implements InstanceProvider {
                 .getObject("NetworkSettings")
                 .getString("IPAddress");
 
+            logger.debug("Created instance! Network address: %s:d", networkAddress, port);
+
             return new Instance(idToUse, logger) {
                 @Override
                 protected Socket connect() throws IOException {
@@ -175,11 +177,10 @@ public class DockerProvider implements InstanceProvider {
             .start();
 
         String inspectStr = StreamUtil.toString(inspectProc.getInputStream(), StandardCharsets.UTF_8);
-        logger.debug(inspectStr);
+//        logger.debug(inspectStr);
 
-        JsonArray inspect = Rson.DEFAULT.fromJson(inspectStr, JsonArray.class);
-
-        return inspect.getObject(0);
+        return Rson.DEFAULT.fromJson(inspectStr, JsonArray.class)
+            .getObject(0);
     }
 
 }
