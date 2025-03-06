@@ -58,7 +58,7 @@ public class DockerProvider implements InstanceProvider {
             new ProcessBuilder(command.asList())
                 .redirectError(Redirect.INHERIT)
                 .redirectOutput(Redirect.INHERIT)
-                .redirectInput(Redirect.DISCARD)
+                .redirectInput(Redirect.PIPE)
                 .start()
                 .waitFor();
         }
@@ -106,7 +106,7 @@ public class DockerProvider implements InstanceProvider {
             Process proc = new ProcessBuilder(command.asList())
                 .redirectError(Redirect.DISCARD)
                 .redirectOutput(Redirect.DISCARD)
-                .redirectInput(Redirect.DISCARD)
+                .redirectInput(Redirect.PIPE)
                 .start();
 
             Thread
