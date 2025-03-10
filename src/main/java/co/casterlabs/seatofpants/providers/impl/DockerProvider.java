@@ -127,6 +127,10 @@ public class DockerProvider implements InstanceProvider {
                 networkSettings.getString("IPAddress") : //
                 networkSettings.getObject("Networks").getObject(this.config.networkToUse).getString("IPAddress");
 
+            if (SeatOfPants.config.providerInstanceWaitTimeSeconds > 0) {
+                Thread.sleep(SeatOfPants.config.providerInstanceWaitTimeSeconds * 1000);
+            }
+
             logger.debug("Created instance! Network address: %s:%d", networkAddress, port);
 
             return new Instance(idToUse, logger) {
@@ -167,10 +171,8 @@ public class DockerProvider implements InstanceProvider {
                         .waitFor();
                 }
             };
-        } catch (IOException |
-
-            InterruptedException e) {
-            throw new InstanceCreationException(e);
+        } catch (Throwable t) {
+            throw new InstanceCreationException(t);
         }
     }
 

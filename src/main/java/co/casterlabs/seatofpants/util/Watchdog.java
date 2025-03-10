@@ -10,7 +10,6 @@ public class Watchdog implements AutoCloseable {
 
     public Watchdog(long timeout) {
         Thread threadToInterrupt = Thread.currentThread();
-
         Thread
             .ofVirtual()
             .name("Watchdog Thread")
@@ -19,7 +18,7 @@ public class Watchdog implements AutoCloseable {
                     Thread.sleep(timeout);
                 } catch (InterruptedException ignored) {}
 
-                if (!finished) {
+                if (!this.finished) {
                     LOGGER.severe("Task took longer than %dms, attempting to interrupt!", timeout);
                     threadToInterrupt.interrupt();
                 }

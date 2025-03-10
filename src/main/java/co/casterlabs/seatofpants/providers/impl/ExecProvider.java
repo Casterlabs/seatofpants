@@ -94,6 +94,10 @@ public class ExecProvider implements InstanceProvider {
                     SeatOfPants.tick();
                 });
 
+            if (SeatOfPants.config.providerInstanceWaitTimeSeconds > 0) {
+                Thread.sleep(SeatOfPants.config.providerInstanceWaitTimeSeconds * 1000);
+            }
+
             return new Instance(idToUse, logger) {
                 @Override
                 protected Socket connect() throws IOException {
@@ -116,8 +120,8 @@ public class ExecProvider implements InstanceProvider {
                     proc.destroyForcibly();
                 }
             };
-        } catch (IOException e) {
-            throw new InstanceCreationException(e);
+        } catch (Throwable t) {
+            throw new InstanceCreationException(t);
         }
     }
 

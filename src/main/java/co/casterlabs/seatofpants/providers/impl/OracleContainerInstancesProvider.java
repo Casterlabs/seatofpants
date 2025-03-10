@@ -257,6 +257,10 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                 logger.debug("privateIp=%s", privateIp);
             }
 
+            if (SeatOfPants.config.providerInstanceWaitTimeSeconds > 0) {
+                Thread.sleep(SeatOfPants.config.providerInstanceWaitTimeSeconds * 1000);
+            }
+
             SeatOfPants.runOnClose.remove(destroyInstance); // SOP will take it from here :)
             logger.debug("Created! Took %.2fs.", (System.currentTimeMillis() - startedCreatingAt) / 1000d);
 
@@ -301,11 +305,11 @@ public class OracleContainerInstancesProvider implements InstanceProvider {
                     }
                 }
             };
-        } catch (Exception e) {
+        } catch (Throwable t) {
             if (destroyInstance != null) {
                 Thread.ofVirtual().start(destroyInstance);
             }
-            throw new InstanceCreationException(e);
+            throw new InstanceCreationException(t);
         }
     }
 

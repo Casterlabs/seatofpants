@@ -112,7 +112,7 @@ public class SeatOfPants {
 
             // Wait for another creation call to complete and then recurse.
             LOGGER.debug("Waiting for an existing instance creation operation to complete (or for another instance to have availability).");
-            try (Watchdog wd = new Watchdog(config.providerMaxCreationTime * 2)) {
+            try (Watchdog wd = new Watchdog(config.providerMaxCreationTimeSeconds * 2 * 1000)) {
                 synchronized (notifications) {
                     notifications.wait();
                 }
@@ -153,7 +153,7 @@ public class SeatOfPants {
     }
 
     private static void createNewInstance() throws InstanceCreationException {
-        try (Watchdog wd = new Watchdog(config.providerMaxCreationTime)) {
+        try (Watchdog wd = new Watchdog(config.providerMaxCreationTimeSeconds * 1000)) {
             if (config.maxInstancesLimit != -1 && instances.size() >= config.maxInstancesLimit) {
                 return; // Don't create another.
             }

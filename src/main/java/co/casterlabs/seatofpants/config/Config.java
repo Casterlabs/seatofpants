@@ -27,8 +27,8 @@ public class Config {
     public InstanceProvider.Type providerType;
     public JsonObject providerConfig;
     public int providerMaxRetries = 500;
-    public long providerRetryTimeout = 100;
-    public long providerMaxCreationTime = 120 * 1000;
+    public long providerMaxCreationTimeSeconds = 120;
+    public long providerInstanceWaitTimeSeconds = 5; // Time to wait for the container be ready. -1 to disable.
 
     public ScalingBehavior scalingBehavior = ScalingBehavior.DYNAMIC_POOL;
     public int maxInstancesLimit = -1;
@@ -42,6 +42,11 @@ public class Config {
 
     public long instanceConnectionRateMilliseconds = -1; // -1 to disable.
     public long instanceDisconnectionRateMilliseconds = -1; // -1 to disable.
+
+    @JsonDeserializationMethod("providerMaxCreationTime")
+    private void $deserialize_providerMaxCreationTime(JsonElement e) {
+        this.providerMaxCreationTimeSeconds = e.getAsNumber().longValue() / 1000;
+    }
 
     @JsonDeserializationMethod("instanceConnectionRateSeconds")
     private void $deserialize_instanceConnectionRateSeconds(JsonElement e) {
