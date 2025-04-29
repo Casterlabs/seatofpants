@@ -66,7 +66,7 @@ public abstract class Instance implements Closeable {
         boolean wasConsideredToBeAlive = this.isAlive();
         this.hasBeenDestroyed = true;
 
-        if (wasConsideredToBeAlive && SeatOfPants.config.instanceConnectionRateMilliseconds > 0) {
+        if (wasConsideredToBeAlive && SeatOfPants.config.instanceDisconnectionRateMilliseconds > 0) {
             // We don't want to do this if we've determined the instance to be unhealthy or
             // otherwise dead.
             logger.info("Starting slow/graceful disconnect for %d clients.", this.connections.size());
@@ -75,7 +75,7 @@ public abstract class Instance implements Closeable {
                     s.close();
                 } catch (IOException ignored) {}
                 try {
-                    TimeUnit.MILLISECONDS.sleep(SeatOfPants.config.instanceConnectionRateMilliseconds);
+                    TimeUnit.MILLISECONDS.sleep(SeatOfPants.config.instanceDisconnectionRateMilliseconds);
                 } catch (InterruptedException ignored) {}
             }
         } else {
