@@ -8,7 +8,7 @@ public class Watchdog implements AutoCloseable {
 
     private volatile boolean finished = false;
 
-    public Watchdog(long timeout) {
+    public Watchdog(long timeout, String name) {
         Thread threadToInterrupt = Thread.currentThread();
         Thread
             .ofVirtual()
@@ -19,7 +19,7 @@ public class Watchdog implements AutoCloseable {
                 } catch (InterruptedException ignored) {}
 
                 if (!this.finished) {
-                    LOGGER.severe("Task took longer than %dms, attempting to interrupt!", timeout);
+                    LOGGER.severe("'%s' task took longer than %dms, attempting to interrupt!", name, timeout);
                     threadToInterrupt.interrupt();
                 }
             });

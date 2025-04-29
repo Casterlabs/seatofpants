@@ -61,6 +61,7 @@ public class SeatOfPants {
         Thread
             .ofPlatform()
             .name("Background tick() thread.")
+            .priority(Thread.MAX_PRIORITY)
             .start(() -> {
                 while (!isShuttingDown) {
                     try {
@@ -75,53 +76,55 @@ public class SeatOfPants {
         try {
             LOGGER.info("Incoming connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
 
-            searchLock.lock();
-            try {
-                LOGGER.info("Processing connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
+            while (true) {
+                searchLock.lock();
+                try {
+                    LOGGER.info("Processing connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
 
-                // Look for an existing instance that has capacity.
-                Optional<Instance> potentialInstance = new ArrayList<>(instances.values())
-                    .parallelStream()
-                    .filter((i) -> !i.isExpired())
-                    .filter((i) -> !i.isAboutToExpire())
-                    .filter((i) -> i.hasCapacity())
-                    .filter((i) -> i.isAlive())
-                    .sorted((i1, i2) -> Long.compare(i1.age(), i2.age()) * -1) // Prefer newer instances.
-                    .sorted((i1, i2) -> Long.compare(i1.connectionsCount(), i2.connectionsCount())) // Instances with the least connections
-                    .findFirst();
+                    // Look for an existing instance that has capacity.
+                    Optional<Instance> potentialInstance = new ArrayList<>(instances.values())
+                        .parallelStream()
+                        .filter((i) -> !i.isExpired())
+                        .filter((i) -> !i.isAboutToExpire())
+                        .filter((i) -> i.hasCapacity())
+                        .filter((i) -> i.isAlive())
+                        .sorted((i1, i2) -> Long.compare(i1.age(), i2.age()) * -1) // Prefer newer instances.
+                        .sorted((i1, i2) -> Long.compare(i1.connectionsCount(), i2.connectionsCount())) // Instances with the least connections
+                        .findFirst();
 
-                if (potentialInstance.isPresent()) {
-                    Instance instance = potentialInstance.get();
-                    LOGGER.info("Using instance for request: %s", instance.id);
-                    instance.adopt(socket);
-//                    Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
+                    if (potentialInstance.isPresent()) {
+                        Instance instance = potentialInstance.get();
+                        LOGGER.info("Using instance for request: %s", instance.id);
+                        instance.adopt(socket);
+//                        Thread.ofVirtual().start(SeatOfPants::tick); // Tick asynchronously.
 
-                    if (SeatOfPants.config.instanceConnectionRateMilliseconds > 0) {
-                        try {
-                            // Limit subsequent connections (via the lock)
-                            TimeUnit.MILLISECONDS.sleep(SeatOfPants.config.instanceConnectionRateMilliseconds);
-                        } catch (InterruptedException ignored) {}
+                        if (SeatOfPants.config.instanceConnectionRateMilliseconds > 0) {
+                            try {
+                                // Limit subsequent connections (via the lock)
+                                TimeUnit.MILLISECONDS.sleep(SeatOfPants.config.instanceConnectionRateMilliseconds);
+                            } catch (InterruptedException ignored) {}
+                        }
+                        return; // DO NOT execute the below logic.
                     }
-                    return; // DO NOT execute the below logic.
+                } finally {
+                    searchLock.unlock();
                 }
-            } finally {
-                searchLock.unlock();
-            }
 
-            // There was no instance ready...
+                // There was no instance ready...
 
-            // Wait for another creation call to complete and then recurse.
-            LOGGER.debug("Waiting for an existing instance creation operation to complete (or for another instance to have availability).");
-            try (Watchdog wd = new Watchdog(config.providerMaxCreationTimeSeconds * 2 * 1000)) {
-                synchronized (notifications) {
-                    notifications.wait();
+                // Wait for another creation call to complete and then Repeat.
+                LOGGER.debug("Waiting for an existing instance creation operation to complete (or for another instance to have availability).");
+                try (Watchdog wd = new Watchdog(config.providerMaxCreationTimeSeconds * 2 * 1000, "Instance creation wait")) {
+                    synchronized (notifications) {
+                        notifications.wait();
+                    }
+                } finally {
+                    Thread.interrupted(); // Clear.
+                    // This bails out of the loop if the watchdog times out.
                 }
-            } finally {
-                Thread.interrupted(); // Clear.
-            }
 
-            // Recurse.
-            handle(socket);
+                // Repeat.
+            }
         } catch (Throwable t) {
             LOGGER.info("Closed connection: #%d %s", socket.hashCode(), socket.getRemoteSocketAddress());
             Thread.interrupted(); // Clear.
@@ -153,7 +156,7 @@ public class SeatOfPants {
     }
 
     private static void createNewInstance() throws InstanceCreationException {
-        try (Watchdog wd = new Watchdog(config.providerMaxCreationTimeSeconds * 1000)) {
+        try (Watchdog wd = new Watchdog(config.providerMaxCreationTimeSeconds * 1000, "Instance create")) {
             if (config.maxInstancesLimit != -1 && instances.size() >= config.maxInstancesLimit) {
                 return; // Don't create another.
             }

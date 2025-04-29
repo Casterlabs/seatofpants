@@ -45,7 +45,7 @@ public abstract class Instance implements Closeable {
         if (this.hasBeenDestroyed) return false;
 
         if (System.currentTimeMillis() - this.lastAliveCheck > CACHE_ALIVE_CHECK_FOR) {
-            try (Watchdog wd = new Watchdog(8000)) {
+            try (Watchdog wd = new Watchdog(20_000, "Instance health check")) {
                 this.isAlive = this.isAlive0();
             } catch (Exception e) {
                 this.logger.trace(e);
